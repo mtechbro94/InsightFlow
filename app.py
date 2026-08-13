@@ -18,13 +18,15 @@ app = Flask(__name__)
 UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
 DOWNLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'downloads'))
 STATIC_CHARTS_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static', 'charts'))
+HISTORY_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'history'))
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['DOWNLOAD_FOLDER'] = DOWNLOAD_FOLDER
 app.config['STATIC_CHARTS_FOLDER'] = STATIC_CHARTS_FOLDER
+app.config['HISTORY_FOLDER'] = HISTORY_FOLDER
 
 # Ensure directories exist
-for folder in [UPLOAD_FOLDER, DOWNLOAD_FOLDER, STATIC_CHARTS_FOLDER]:
+for folder in [UPLOAD_FOLDER, DOWNLOAD_FOLDER, STATIC_CHARTS_FOLDER, HISTORY_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
 # Application state stored in memory (dictionary cache)
@@ -228,8 +230,32 @@ def api_analyze():
             pdf_report_path
         )
 
+        # Option E: Save to history JSON
+        import uuid
+        from datetime import datetime
+        history_id = str(uuid.uuid4())[:8]
+        history_item = {
+            'id': history_id,
+            'filename': session_state['filename'],
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'record_count': int(active_profile['num_records']),
+            'kpis': kpis,
+            'eda': eda_results,
+            'insights': insights,
+            'outliers': session_state['outliers'],
+            'datasetMetadata': active_profile,
+            'plotly_charts': plotly_charts,
+            'cleaning_log': session_state['cleaning_log'],
+            'converted_csv_path': session_state['converted_csv_path'],
+            'cleaned_csv_path': session_state['cleaned_csv_path']
+        }
+        history_path = os.path.join(app.config['HISTORY_FOLDER'], f"{history_id}.json")
+        with open(history_path, 'w') as f:
+            json.dump(history_item, f, default=str)
+
         return jsonify({
             'message': 'Analysis complete. Dashboard and PDF generated.',
+            'history_id': history_id,
             'kpis': kpis,
             'insights': insights,
             'plotly_charts': plotly_charts,
@@ -294,6 +320,10 @@ def api_download(file_type):
     elif file_type == 'pdf':
         target = os.path.join(app.config['DOWNLOAD_FOLDER'], 'analytical_report.pdf')
         filename = "analytical_report.pdf"
+        mimetype = "application/pdf"
+    elif file_type == 'custom_pdf':
+        target = os.path.join(app.config['DOWNLOAD_FOLDER'], 'custom_analytical_report.pdf')
+        filename = "custom_analytical_report.pdf"
         mimetype = "application/pdf"
     else:
         return jsonify({'error': f"Unknown download type '{file_type}'"}), 400
@@ -519,6 +549,172 @@ def api_column_values(col_name):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/upload_logo', methods=['POST'])
+def api_upload_logo():
+    """Saves custom logo upload temporarily for PDF report generation."""
+    if 'logo' not in request.files:
+        return jsonify({'error': 'No file uploaded.'}), 400
+    file = request.files['logo']
+    if file.filename == '':
+        return jsonify({'error': 'Empty filename.'}), 400
+        
+    filename = secure_filename(file.filename)
+    logo_path = os.path.join(app.config['UPLOAD_FOLDER'], f"custom_logo_{filename}")
+    file.save(logo_path)
+    return jsonify({
+        'logo_path': logo_path,
+        'filename': filename
+    })
+
+@app.route('/api/export/custom_pdf', methods=['POST'])
+def api_export_custom_pdf():
+    """Generates a customized, white-labeled PDF report."""
+    active_csv_path = session_state['cleaned_csv_path'] or session_state['converted_csv_path']
+    active_profile = session_state['cleaned_profile'] or session_state['profile']
+    
+    if not active_csv_path:
+        return jsonify({'error': 'No active dataset available.'}), 400
+
+    data = request.json or {}
+    title = data.get('title', 'EXECUTIVE ANALYSIS REPORT')
+    company = data.get('company', 'InsightFlow')
+    accent_color = data.get('accent_color', '#4f46e5')
+    include_sections = data.get('include_sections', ['kpis', 'quality', 'insights', 'charts', 'recommendations'])
+    logo_path = data.get('logo_path', None)
+
+    try:
+        df = pd.read_csv(active_csv_path)
+        eda_results = session_state.get('eda_results')
+        kpis = session_state.get('kpis')
+        insights = session_state.get('insights')
+        
+        static_charts = {}
+        for filename in os.listdir(app.config['STATIC_CHARTS_FOLDER']):
+            if filename.endswith('.png'):
+                name = filename.replace('.png', '')
+                static_charts[name] = os.path.join(app.config['STATIC_CHARTS_FOLDER'], filename)
+
+        custom_pdf_path = os.path.join(app.config['DOWNLOAD_FOLDER'], 'custom_analytical_report.pdf')
+        
+        metadata = {
+            'filename': session_state['filename'],
+            'num_records': active_profile['num_records'],
+            'num_features': active_profile['num_features'],
+            'total_missing': active_profile['total_missing'],
+            'duplicate_count': active_profile['duplicate_count']
+        }
+        
+        report_generator.generate_pdf_report(
+            metadata,
+            eda_results,
+            insights,
+            kpis,
+            static_charts,
+            custom_pdf_path,
+            title=title,
+            company=company,
+            accent_color=accent_color,
+            include_sections=include_sections,
+            logo_path=logo_path
+        )
+        
+        return jsonify({
+            'message': 'Custom PDF generated successfully.',
+            'download_url': '/api/download/custom_pdf'
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': f"Custom PDF generation failed: {str(e)}"}), 500
+
+@app.route('/api/history', methods=['GET'])
+def api_get_history():
+    """Lists recent historical audits in history/."""
+    try:
+        items = []
+        for filename in os.listdir(app.config['HISTORY_FOLDER']):
+            if filename.endswith('.json'):
+                path = os.path.join(app.config['HISTORY_FOLDER'], filename)
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                    items.append({
+                        'id': data.get('id'),
+                        'filename': data.get('filename'),
+                        'timestamp': data.get('timestamp'),
+                        'record_count': data.get('record_count')
+                    })
+        # Sort by timestamp descending
+        items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return jsonify({'history': items[:10]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/history/load/<history_id>', methods=['GET'])
+def api_load_history(history_id):
+    """Loads a previous analysis session from history JSON."""
+    history_path = os.path.join(app.config['HISTORY_FOLDER'], f"{history_id}.json")
+    if not os.path.exists(history_path):
+        return jsonify({'error': 'Session history item not found.'}), 404
+        
+    try:
+        with open(history_path, 'r') as f:
+            data = json.load(f)
+            
+        session_state['filename'] = data.get('filename')
+        session_state['converted_csv_path'] = data.get('converted_csv_path')
+        session_state['cleaned_csv_path'] = data.get('cleaned_csv_path')
+        session_state['kpis'] = data.get('kpis')
+        session_state['insights'] = data.get('insights')
+        session_state['eda_results'] = data.get('eda')
+        session_state['outliers'] = data.get('outliers')
+        session_state['cleaning_log'] = data.get('cleaning_log', [])
+        
+        profile = data.get('datasetMetadata')
+        session_state['profile'] = profile
+        session_state['cleaned_profile'] = profile
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': f"Failed to load history session: {str(e)}"}), 500
+
+@app.route('/api/pivot', methods=['POST'])
+def api_pivot():
+    """Calculates pandas pivot table grouping dynamically."""
+    active_csv_path = session_state['cleaned_csv_path'] or session_state['converted_csv_path']
+    if not active_csv_path or not os.path.exists(active_csv_path):
+        return jsonify({'error': 'No dataset loaded.'}), 400
+
+    data = request.json or {}
+    row_col = data.get('row')
+    col_col = data.get('col')
+    val_col = data.get('val')
+    agg_func = data.get('agg', 'sum')
+
+    if not row_col or not val_col:
+        return jsonify({'error': 'Row grouping and calculation value columns are required.'}), 400
+
+    try:
+        df = pd.read_csv(active_csv_path)
+        
+        # Make pivot using pandas
+        if col_col:
+            pivot_df = df.pivot_table(index=row_col, columns=col_col, values=val_col, aggfunc=agg_func).fillna(0)
+            columns = [str(c) for c in pivot_df.columns]
+        else:
+            pivot_df = df.groupby(row_col)[val_col].agg(agg_func).to_frame()
+            columns = [val_col]
+            
+        index = [str(i) for i in pivot_df.index]
+        cells = pivot_df.values.tolist()
+        
+        return jsonify({
+            'index': index,
+            'columns': columns,
+            'cells': cells
+        })
+    except Exception as e:
+        return jsonify({'error': f"Pivot calculation failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Start on standard port 5000

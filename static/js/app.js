@@ -912,3 +912,300 @@ function changeDashboardTheme(themeName) {
     // Re-render dashboard visualizations with new colors
     renderDashboardCharts();
 }
+
+// 10. PDF Report Custom Designer (Option D)
+function openPdfDesigner() {
+    document.getElementById('pdf-designer-modal').classList.remove('hidden');
+    if (THEMES[currentTheme]) {
+        document.getElementById('pdf-custom-color').value = THEMES[currentTheme].primary;
+    }
+}
+
+function closePdfDesigner() {
+    document.getElementById('pdf-designer-modal').classList.add('hidden');
+}
+
+async function generateCustomPdfReport() {
+    const title = document.getElementById('pdf-custom-title').value.trim();
+    const company = document.getElementById('pdf-custom-company').value.trim();
+    const accentColor = document.getElementById('pdf-custom-color').value;
+    const logoFile = document.getElementById('pdf-custom-logo').files[0];
+    
+    const includeSections = [];
+    if (document.getElementById('pdf-sec-kpis').checked) includeSections.push('kpis');
+    if (document.getElementById('pdf-sec-quality').checked) includeSections.push('quality');
+    if (document.getElementById('pdf-sec-insights').checked) includeSections.push('insights');
+    if (document.getElementById('pdf-sec-charts').checked) includeSections.push('charts');
+    if (document.getElementById('pdf-sec-recs').checked) includeSections.push('recommendations');
+    
+    closePdfDesigner();
+    showSpinner("Compiling customized report assets...");
+    
+    let uploadedLogoPath = null;
+    
+    if (logoFile) {
+        try {
+            const formData = new FormData();
+            formData.append('logo', logoFile);
+            
+            const uploadRes = await fetch('/api/upload_logo', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const uploadResult = await uploadRes.json();
+            if (uploadRes.ok) {
+                uploadedLogoPath = uploadResult.logo_path;
+            }
+        } catch (logoErr) {
+            console.warn("Failed to upload logo asset: " + logoErr.message);
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/export/custom_pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title || 'Executive Analysis Report',
+                company: company || 'InsightFlow',
+                accent_color: accentColor,
+                include_sections: includeSections,
+                logo_path: uploadedLogoPath
+            })
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Custom PDF compilation failed: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        window.location.href = result.download_url;
+    } catch (e) {
+        hideSpinner();
+        alert("Report generation crashed: " + e.message);
+    }
+}
+
+// 11. Recent Analysis History Drawer (Option E)
+async function loadHistoryList() {
+    const section = document.getElementById('recent-history-section');
+    const container = document.getElementById('recent-history-list');
+    
+    try {
+        const response = await fetch('/api/history');
+        if (!response.ok) return;
+        
+        const result = await response.json();
+        const items = result.history || [];
+        
+        if (items.length === 0) {
+            section.classList.add('hidden');
+            return;
+        }
+        
+        section.classList.remove('hidden');
+        container.innerHTML = '';
+        
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = "flex items-center justify-between p-4 bg-slate-900 border border-slate-850 hover:border-indigo-500/50 hover:bg-slate-900/80 rounded-2xl cursor-pointer transition-all duration-200 group";
+            card.onclick = () => loadHistoryItem(item.id);
+            
+            card.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl group-hover:scale-105 transition-transform duration-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">${item.filename}</h4>
+                        <p class="text-[10px] text-slate-500 mt-0.5">${item.record_count.toLocaleString()} rows • ${item.timestamp}</p>
+                    </div>
+                </div>
+                <div class="text-xs text-indigo-400 font-semibold flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span>Load Dashboard</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } catch (err) {
+        console.warn("Failed to load history items: " + err.message);
+    }
+}
+
+async function loadHistoryItem(historyId) {
+    showSpinner("Restoring analysis history session...");
+    
+    try {
+        const response = await fetch(`/api/history/load/${historyId}`);
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Failed to load history project: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        activeDashboardData = result;
+        activePlotlyCharts = result.plotly_charts;
+        datasetMetadata = result.datasetMetadata;
+        datasetProfile = result.datasetMetadata;
+        
+        document.getElementById('step-upload').classList.add('hidden');
+        document.getElementById('step-cleaning').classList.add('hidden');
+        document.getElementById('step-logs').classList.add('hidden');
+        document.getElementById('step-dashboard').classList.remove('hidden');
+        
+        renderDashboardKPIs();
+        renderDashboardInsights();
+        renderOutliersWarning();
+        renderDashboardCharts();
+        
+        tablePage = 0;
+        tableQuery = '';
+        document.getElementById('table-search').value = '';
+        renderTableExplorer();
+    } catch (e) {
+        hideSpinner();
+        alert("Session recovery failed: " + e.message);
+    }
+}
+
+// 12. No-Code Pivot Table Grid Orchestrator (Option F)
+function switchExplorerTab(tab) {
+    const btnRecords = document.getElementById('tab-btn-records');
+    const btnPivot = document.getElementById('tab-btn-pivot');
+    const viewRecords = document.getElementById('explorer-records-view');
+    const viewPivot = document.getElementById('explorer-pivot-view');
+    
+    if (tab === 'records') {
+        btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all";
+        btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
+        viewRecords.classList.remove('hidden');
+        viewPivot.classList.add('hidden');
+    } else {
+        btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all";
+        btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all ml-1";
+        viewRecords.classList.add('hidden');
+        viewPivot.classList.remove('hidden');
+        
+        populatePivotDropdowns();
+    }
+}
+
+function populatePivotDropdowns() {
+    const meta = datasetMetadata || (activeDashboardData ? activeDashboardData.datasetMetadata : null);
+    if (!meta || !meta.columns) return;
+    
+    const rowSelect = document.getElementById('pivot-row-select');
+    const colSelect = document.getElementById('pivot-col-select');
+    const valSelect = document.getElementById('pivot-val-select');
+    
+    rowSelect.innerHTML = '';
+    colSelect.innerHTML = '<option value="">(None)</option>';
+    valSelect.innerHTML = '';
+    
+    Object.entries(meta.columns).forEach(([colName, colInfo]) => {
+        const type = colInfo.inferred_type;
+        
+        const opt1 = document.createElement('option');
+        opt1.value = colName;
+        opt1.textContent = colName;
+        rowSelect.appendChild(opt1);
+        
+        const opt2 = document.createElement('option');
+        opt2.value = colName;
+        opt2.textContent = colName;
+        colSelect.appendChild(opt2);
+        
+        if (type === 'numeric') {
+            const opt3 = document.createElement('option');
+            opt3.value = colName;
+            opt3.textContent = colName;
+            valSelect.appendChild(opt3);
+        }
+    });
+}
+
+async function calculatePivotTable() {
+    const row = document.getElementById('pivot-row-select').value;
+    const col = document.getElementById('pivot-col-select').value;
+    const val = document.getElementById('pivot-val-select').value;
+    const agg = document.getElementById('pivot-agg-select').value;
+    
+    if (!row || !val) {
+        alert("Please select both Row grouping and calculation Value fields.");
+        return;
+    }
+    
+    showSpinner("Computing pivot matrix...");
+    
+    try {
+        const response = await fetch('/api/pivot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ row, col, val, agg })
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Pivot calculation failed: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        const thead = document.getElementById('pivot-thead-row');
+        const tbody = document.getElementById('pivot-tbody-rows');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        
+        const thRowLabel = document.createElement('th');
+        thRowLabel.className = "px-6 py-3 text-left font-bold text-slate-200 border-b border-slate-800 bg-slate-950";
+        thRowLabel.textContent = `${row} \\ ${col || '(Value)'}`;
+        thead.appendChild(thRowLabel);
+        
+        result.columns.forEach(cName => {
+            const th = document.createElement('th');
+            th.className = "px-6 py-3 text-right font-bold text-slate-200 border-b border-slate-800 bg-slate-950";
+            th.textContent = cName;
+            thead.appendChild(th);
+        });
+        
+        result.index.forEach((idxVal, rowIndex) => {
+            const tr = document.createElement('tr');
+            tr.className = rowIndex % 2 === 0 ? 'bg-slate-900/40 hover:bg-slate-900/60' : 'bg-slate-955/20 hover:bg-slate-900/40';
+            
+            const tdIndex = document.createElement('td');
+            tdIndex.className = "px-6 py-3.5 text-left font-semibold text-slate-300 border-b border-slate-850";
+            tdIndex.textContent = idxVal;
+            tr.appendChild(tdIndex);
+            
+            result.cells[rowIndex].forEach(cellVal => {
+                const tdVal = document.createElement('td');
+                tdVal.className = "px-6 py-3.5 text-right font-mono text-slate-200 border-b border-slate-850";
+                
+                if (typeof cellVal === 'number') {
+                    tdVal.textContent = cellVal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                } else {
+                    tdVal.textContent = cellVal;
+                }
+                tr.appendChild(tdVal);
+            });
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        hideSpinner();
+        alert("Server communication crashed during pivot: " + e.message);
+    }
+}
+
+// Window load event bindings
+document.addEventListener('DOMContentLoaded', () => {
+    loadHistoryList();
+});
+

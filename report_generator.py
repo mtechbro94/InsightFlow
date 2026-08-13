@@ -730,6 +730,19 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
         f.write(html_content)
 
 class PDFReport(FPDF):
+    def __init__(self, title="AUTOMATED ANALYTICAL DATA REPORT", company="InsightFlow", accent_color="#4f46e5", logo_path=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.report_title = title
+        self.report_company = company
+        self.logo_path = logo_path
+        
+        # Parse hex color
+        try:
+            h = accent_color.lstrip('#')
+            self.accent_rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        except Exception:
+            self.accent_rgb = (79, 70, 229) # Indigo
+
     def clean_text(self, text):
         if isinstance(text, str):
             # Replace ₹ with Rs. and replace other non-latin-1 characters with ?
@@ -753,31 +766,42 @@ class PDFReport(FPDF):
         return super().multi_cell(w, h, txt, border, align, fill, **kwargs)
 
     def header(self):
-        # Draw top colored banner
-        self.set_fill_color(15, 23, 42) # Slate-900
+        # Draw top colored banner with dynamic accent color
+        self.set_fill_color(*self.accent_rgb)
         self.rect(0, 0, 210, 30, 'F')
         
         # White Text in Banner
-        self.set_font('Helvetica', 'B', 15)
+        self.set_font('Helvetica', 'B', 14)
         self.set_text_color(255, 255, 255)
         self.set_y(10)
-        self.cell(0, 10, "AUTOMATED ANALYTICAL DATA REPORT", align='C', new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 10, self.report_title.upper(), align='C', new_x="LMARGIN", new_y="NEXT")
+        
+        # Draw logo icon inside the header banner if provided
+        if self.logo_path and os.path.exists(self.logo_path):
+            try:
+                self.image(self.logo_path, 10, 5, h=20)
+            except Exception:
+                pass
         
         # Spacer
         self.set_y(35)
         
     def footer(self):
-        # Position at 1.5 cm from bottom
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8)
-        self.set_text_color(100, 116, 139) # slate text
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}} | Generated automatically by ADA Tool", align='C')
+        self.set_text_color(100, 116, 139)
+        self.cell(0, 10, f"Page {self.page_no()}/{{nb}} | Generated for {self.report_company} by InsightFlow", align='C')
 
-def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_paths, output_pdf_path):
+def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_paths, output_pdf_path,
+                        title="EXECUTIVE ANALYSIS REPORT", company="InsightFlow", accent_color="#4f46e5",
+                        include_sections=None, logo_path=None):
     """
     Generates a professional multi-page PDF analytical report from computed metrics and static charts.
     """
-    pdf = PDFReport()
+    if include_sections is None:
+        include_sections = ['kpis', 'quality', 'insights', 'charts', 'recommendations']
+
+    pdf = PDFReport(title=title, company=company, accent_color=accent_color, logo_path=logo_path)
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.alias_nb_pages()
     
@@ -785,11 +809,19 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
     pdf.add_page()
     pdf.set_text_color(15, 23, 42) # Slate dark text
     
-    pdf.set_font('Helvetica', 'B', 22)
-    pdf.cell(0, 15, "EXECUTIVE ANALYSIS REPORT", align='L', new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font('Helvetica', '', 12)
+    pdf.set_font('Helvetica', 'B', 20)
+    pdf.cell(0, 15, title.upper(), align='L', new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font('Helvetica', '', 11)
     pdf.cell(0, 8, f"Report Target Filename: {metadata.get('filename')}", align='L', new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Total Features: {metadata.get('num_features')} | Total Records Count: {metadata.get('num_records'):,}", align='L', new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Company: {company} | Total Records Count: {metadata.get('num_records'):,}", align='L', new_x="LMARGIN", new_y="NEXT")
+    
+    # Embed custom cover page logo if provided
+    if logo_path and os.path.exists(logo_path):
+        try:
+            pdf.image(logo_path, x=160, y=40, w=35)
+        except Exception:
+            pass
+            
     pdf.ln(5)
     
     # Horizontal line
@@ -804,7 +836,6 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
     pdf.ln(2)
     pdf.set_font('Helvetica', '', 10)
     
-    # Calculate some dynamic content for Exec Summary
     total_records = metadata.get('num_records', 0)
     num_features = metadata.get('num_features', 0)
     missing_str = f"The dataset features high completeness, with only {metadata.get('total_missing', 0):,} missing cells identified and corrected." if metadata.get('total_missing', 0) == 0 else f"A total of {metadata.get('total_missing', 0):,} missing elements were detected and prepared during data ingestion."
@@ -821,65 +852,66 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
     pdf.multi_cell(0, 6, summary_text)
     pdf.ln(5)
     
-    # Core KPIs Section
-    pdf.set_font('Helvetica', 'B', 14)
-    pdf.cell(0, 8, "2. Key Metrics & KPIs", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    # Draw KPI Table headers
-    pdf.set_fill_color(241, 245, 249) # pale slate table header
-    pdf.set_font('Helvetica', 'B', 10)
-    pdf.cell(90, 8, " KPI Descriptor", border=1, fill=True)
-    pdf.cell(50, 8, " Value", border=1, fill=True)
-    pdf.cell(50, 8, " Column Association", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
-    
-    # Populate rows
-    pdf.set_font('Helvetica', '', 10)
-    for kpi in kpis[:8]: # limit table size
-        pdf.cell(90, 7, f" {kpi['name']}", border=1)
-        pdf.cell(50, 7, f" {kpi['value']}", border=1)
-        pdf.cell(50, 7, f" {kpi['column']}", border=1, new_x="LMARGIN", new_y="NEXT")
+    if 'kpis' in include_sections:
+        # Core KPIs Section
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 8, "2. Key Metrics & KPIs", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
         
-    # PAGE 2: Data Quality Assessment & Insights
-    pdf.add_page()
-    pdf.set_font('Helvetica', 'B', 14)
-    pdf.cell(0, 8, "3. Data Quality & Cleaning Logs", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    # Missing/duplicates summary
-    pdf.set_font('Helvetica', '', 10)
-    pdf.cell(0, 6, f"- Total duplicate rows removed: {metadata.get('duplicate_count', 0):,}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"- Total empty fields found: {metadata.get('total_missing', 0):,}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    # Insights Section
-    pdf.set_font('Helvetica', 'B', 14)
-    pdf.cell(0, 8, "4. Key Analytical Insights", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    # Write categorized insights
-    for category, list_of_insights in insights.items():
-        if list_of_insights:
-            pdf.set_font('Helvetica', 'B', 11)
-            pdf.cell(0, 6, f"{category.replace('_', ' ').title()} Insights:", new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font('Helvetica', '', 9.5)
-            for ins in list_of_insights[:3]: # keep top 3 per category to fit page nicely
-                pdf.multi_cell(0, 5, f"  - {ins}")
-                pdf.ln(1)
-            pdf.ln(2)
+        # Draw KPI Table headers
+        pdf.set_fill_color(241, 245, 249) # pale slate table header
+        pdf.set_font('Helvetica', 'B', 10)
+        pdf.cell(90, 8, " KPI Descriptor", border=1, fill=True)
+        pdf.cell(50, 8, " Value", border=1, fill=True)
+        pdf.cell(50, 8, " Column Association", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        
+        # Populate rows
+        pdf.set_font('Helvetica', '', 10)
+        for kpi in kpis[:8]: # limit table size
+            pdf.cell(90, 7, f" {kpi['name']}", border=1)
+            pdf.cell(50, 7, f" {kpi['value']}", border=1)
+            pdf.cell(50, 7, f" {kpi['column']}", border=1, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
+        
+    if 'quality' in include_sections:
+        # PAGE 2: Data Quality Assessment & Cleaning Logs
+        pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 8, "3. Data Quality & Cleaning Logs", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        
+        pdf.set_font('Helvetica', '', 10)
+        pdf.cell(0, 6, f"- Total duplicate rows removed: {metadata.get('duplicate_count', 0):,}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 6, f"- Total empty fields found: {metadata.get('total_missing', 0):,}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+        
+    if 'insights' in include_sections:
+        # Insights Section
+        if 'quality' not in include_sections:
+            pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 8, "4. Key Analytical Insights", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        
+        for category, list_of_insights in insights.items():
+            if list_of_insights:
+                pdf.set_font('Helvetica', 'B', 11)
+                pdf.cell(0, 6, f"{category.replace('_', ' ').title()} Insights:", new_x="LMARGIN", new_y="NEXT")
+                pdf.set_font('Helvetica', '', 9.5)
+                for ins in list_of_insights[:3]: # keep top 3 per category to fit page nicely
+                    pdf.multi_cell(0, 5, f"  - {ins}")
+                    pdf.ln(1)
+                pdf.ln(2)
 
-    # PAGE 3: Visualizations
-    if static_charts_paths:
+    if 'charts' in include_sections and static_charts_paths:
         pdf.add_page()
         pdf.set_font('Helvetica', 'B', 14)
         pdf.cell(0, 8, "5. Exploratory Visualizations", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
         
-        # Embed the generated Matplotlib PNGs
         y_pos = pdf.get_y()
         for idx, (chart_name, path) in enumerate(static_charts_paths.items()):
             if os.path.exists(path):
-                # Put 2 charts per page to avoid overflow
                 if idx > 0 and idx % 2 == 0:
                     pdf.add_page()
                     pdf.set_font('Helvetica', 'B', 14)
@@ -888,35 +920,35 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
                     y_pos = pdf.get_y()
                 
                 pdf.image(path, x=15, y=pdf.get_y(), w=180, h=90)
-                pdf.ln(95) # Move cursor past the image size + padding
+                pdf.ln(95)
                 
-    # Recommendations & Conclusion Page
-    pdf.add_page()
-    pdf.set_font('Helvetica', 'B', 14)
-    pdf.cell(0, 8, "6. Strategic Recommendations", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    # Write business insights as recommendations
-    pdf.set_font('Helvetica', '', 10)
-    biz_rec = insights.get('business', [])
-    if biz_rec:
-        for rec in biz_rec:
-            pdf.multi_cell(0, 6, f"▪ {rec}")
+    if 'recommendations' in include_sections:
+        # Recommendations & Conclusion Page
+        pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 8, "6. Strategic Recommendations", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        
+        pdf.set_font('Helvetica', '', 10)
+        biz_rec = insights.get('business', [])
+        if biz_rec:
+            for rec in biz_rec:
+                pdf.multi_cell(0, 6, f"▪ {rec}")
+                pdf.ln(3)
+        else:
+            pdf.multi_cell(0, 6, "▪ Focus operations around high-performing category variables and leverage strongly correlated attributes to optimize business outcomes.")
             pdf.ln(3)
-    else:
-        pdf.multi_cell(0, 6, "▪ Focus operations around high-performing category variables and leverage strongly correlated attributes to optimize business outcomes.")
-        pdf.ln(3)
-        pdf.multi_cell(0, 6, "▪ Set up continuous data logging with structured schema layouts to eliminate missing/null data cells prior to automated audits.")
-        pdf.ln(3)
+            pdf.multi_cell(0, 6, "▪ Set up continuous data logging with structured schema layouts to eliminate missing/null data cells prior to automated audits.")
+            pdf.ln(3)
 
-    pdf.ln(5)
-    pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(0, 8, "7. Conclusion", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font('Helvetica', '', 10)
-    pdf.multi_cell(0, 6, 
-        "The automated execution pipeline successfully completed all ingestion, auditing, and processing phases. "
-        "The standardized dataset has been extracted and the interactive single-page dashboard can be opened "
-        "offline to execute dynamic filtering and drill-down operations. For queries, contact the development admin."
-    )
+        pdf.ln(5)
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.cell(0, 8, "7. Conclusion", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font('Helvetica', '', 10)
+        pdf.multi_cell(0, 6, 
+            "The automated execution pipeline successfully completed all ingestion, auditing, and processing phases. "
+            "The standardized dataset has been extracted and the interactive single-page dashboard can be opened "
+            "offline to execute dynamic filtering and drill-down operations. For queries, contact the development admin."
+        )
 
     pdf.output(output_pdf_path)
