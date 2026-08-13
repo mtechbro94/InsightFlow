@@ -387,10 +387,8 @@ async function renderTableExplorer() {
     tbody.innerHTML = '';
 
     // We can query server metadata to render table column names
-    const metadata = activeDashboardData || datasetMetadata;
-    if (!metadata) return;
-
-    const columns = Object.keys(metadata.eda_results?.numerical || metadata.columns);
+    if (!datasetMetadata || !datasetMetadata.columns) return;
+    const columns = Object.keys(datasetMetadata.columns);
     
     // Draw columns headers
     columns.forEach(col => {
