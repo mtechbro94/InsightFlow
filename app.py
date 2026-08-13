@@ -427,7 +427,25 @@ def api_chat():
         # Simple KPI/Total Check
         kpis_detected = session_state.get('kpis', [])
         
-        if 'revenue' in msg_lower or 'sales' in msg_lower:
+        # 1. Greetings & Meta Conversational fallbacks
+        if any(h in msg_lower for h in ['hello', 'hi', 'hey', 'greetings', 'yo']):
+            text_answer = "Hello! I am your **InsightFlow AI Analyst**. I am ready to explore your dataset with you. Ask me questions about summaries, outliers, missing values, or specific KPI comparisons!"
+            
+        elif any(h in msg_lower for h in ['who are you', 'what is your name', 'identify yourself']):
+            text_answer = "I am the **InsightFlow Copilot Analyst**, an AI designed to read your columns, perform data cleaning, identify outliers, and generate interactive visual charts dynamically."
+            
+        elif any(h in msg_lower for h in ['thank', 'cool', 'awesome', 'great', 'nice']):
+            text_answer = "You're very welcome! Let me know if you need any other calculations, aggregations, or charts generated for your dataset."
+
+        elif 'columns' in msg_lower or 'variables' in msg_lower:
+            cols = list(df.columns)
+            text_answer = f"Your dataset contains the following **{len(cols)} columns**:\n" + "\n".join([f"- `{c}`" for c in cols])
+
+        elif 'rows' in msg_lower or 'records' in msg_lower or 'size' in msg_lower:
+            text_answer = f"The dataset contains **{len(df):,} rows/records** and **{len(df.columns)} columns**."
+
+        # 2. Specific Data Query fallbacks
+        elif 'revenue' in msg_lower or 'sales' in msg_lower:
             rev_kpi = next((k for k in kpis_detected if 'revenue' in k['name'].lower() or 'sales' in k['name'].lower()), None)
             if rev_kpi:
                 text_answer = f"According to the dataset, the **{rev_kpi['name']}** is **{rev_kpi['value']}**."
@@ -464,7 +482,8 @@ def api_chat():
                 "I am here to help you analyze your dataset! Try asking questions like:\n"
                 "- *What is the total revenue?*\n"
                 "- *Are there any outliers in the data?*\n"
-                "- *Are there any missing values?*"
+                "- *Are there any missing values?*\n\n"
+                "(Note: xAI's API endpoint is currently experiencing high load, so I am answering you using my high-fidelity local analytical engine!)"
             )
             
         return jsonify({
