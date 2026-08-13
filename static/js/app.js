@@ -324,30 +324,87 @@ function renderDashboardCharts() {
         return;
     }
 
-    // Extract available chart keys
-    let chartKeys = [];
-    
-    // Correlation Matrix Heatmap first
-    if (activePlotlyCharts.correlation_heatmap) chartKeys.push('correlation_heatmap');
-    if (activePlotlyCharts.scatter_relation) chartKeys.push('scatter_relation');
-    
-    // Add sub-chart categories
-    if (activePlotlyCharts.distributions) {
-        Object.keys(activePlotlyCharts.distributions).forEach(k => chartKeys.push(`distributions__${k}`));
+    // Design intelligent slots for the 4 charts
+    let slots = [null, null, null, null];
+
+    // 1. Time Series / Trend (Slot 1 Priority)
+    if (activePlotlyCharts.time_series && Object.keys(activePlotlyCharts.time_series).length > 0) {
+        const key = Object.keys(activePlotlyCharts.time_series)[0];
+        slots[0] = `time_series__${key}`;
+    }
+
+    // 2. Business Category Aggregations (Slot 2 Priority)
+    if (activePlotlyCharts.cat_num_relationships && Object.keys(activePlotlyCharts.cat_num_relationships).length > 0) {
+        const cat = Object.keys(activePlotlyCharts.cat_num_relationships)[0];
+        const num = Object.keys(activePlotlyCharts.cat_num_relationships[cat])[0];
+        slots[1] = `cat_num__${cat}__${num}`;
+    } else if (activePlotlyCharts.categorical && Object.keys(activePlotlyCharts.categorical).length > 0) {
+        const key = Object.keys(activePlotlyCharts.categorical)[0];
+        slots[1] = `categorical__${key}`;
+    }
+
+    // 3. Correlations & Scatter (Slot 3 Priority)
+    if (activePlotlyCharts.correlation_heatmap) {
+        slots[2] = 'correlation_heatmap';
+    } else if (activePlotlyCharts.scatter_relation) {
+        slots[2] = 'scatter_relation';
+    } else if (activePlotlyCharts.distributions && Object.keys(activePlotlyCharts.distributions).length > 0) {
+        const key = Object.keys(activePlotlyCharts.distributions)[0];
+        slots[2] = `distributions__${key}`;
+    }
+
+    // 4. Outliers Box Plot / Secondary Distribution (Slot 4 Priority)
+    if (activePlotlyCharts.box_plots && Object.keys(activePlotlyCharts.box_plots).length > 0) {
+        const key = Object.keys(activePlotlyCharts.box_plots)[0];
+        slots[3] = `box_plots__${key}`;
+    } else if (activePlotlyCharts.distributions && Object.keys(activePlotlyCharts.distributions).length > 1) {
+        const key = Object.keys(activePlotlyCharts.distributions)[1];
+        slots[3] = `distributions__${key}`;
+    }
+
+    // Accumulate all available charts to backfill empty slots
+    let allAvailable = [];
+    if (activePlotlyCharts.correlation_heatmap) allAvailable.push('correlation_heatmap');
+    if (activePlotlyCharts.scatter_relation) allAvailable.push('scatter_relation');
+    if (activePlotlyCharts.time_series) {
+        Object.keys(activePlotlyCharts.time_series).forEach(k => allAvailable.push(`time_series__${k}`));
+    }
+    if (activePlotlyCharts.cat_num_relationships) {
+        Object.keys(activePlotlyCharts.cat_num_relationships).forEach(cat => {
+            Object.keys(activePlotlyCharts.cat_num_relationships[cat]).forEach(num => {
+                allAvailable.push(`cat_num__${cat}__${num}`);
+            });
+        });
     }
     if (activePlotlyCharts.categorical) {
-        Object.keys(activePlotlyCharts.categorical).forEach(k => chartKeys.push(`categorical__${k}`));
+        Object.keys(activePlotlyCharts.categorical).forEach(k => allAvailable.push(`categorical__${k}`));
     }
-    if (activePlotlyCharts.time_series) {
-        Object.keys(activePlotlyCharts.time_series).forEach(k => chartKeys.push(`time_series__${k}`));
+    if (activePlotlyCharts.distributions) {
+        Object.keys(activePlotlyCharts.distributions).forEach(k => allAvailable.push(`distributions__${k}`));
     }
+    if (activePlotlyCharts.box_plots) {
+        Object.keys(activePlotlyCharts.box_plots).forEach(k => allAvailable.push(`box_plots__${k}`));
+    }
+
+    // Fill in empty slots with unused available charts
+    for (let i = 0; i < 4; i++) {
+        if (slots[i] === null) {
+            const nextUnused = allAvailable.find(k => !slots.includes(k));
+            if (nextUnused) {
+                slots[i] = nextUnused;
+            }
+        }
+    }
+
+    // Filter out nulls
+    const finalSlots = slots.filter(s => s !== null);
 
     targets.forEach((targetId, idx) => {
         const container = document.getElementById(targetId);
         container.innerHTML = '';
 
-        if (idx < chartKeys.length) {
-            const key = chartKeys[idx];
+        if (idx < finalSlots.length) {
+            const key = finalSlots[idx];
             let chartConfig = null;
 
             if (key === 'correlation_heatmap') {
@@ -363,6 +420,14 @@ function renderDashboardCharts() {
             } else if (key.startsWith('time_series__')) {
                 const colName = key.split('__')[1];
                 chartConfig = activePlotlyCharts.time_series[colName];
+            } else if (key.startsWith('box_plots__')) {
+                const colName = key.split('__')[1];
+                chartConfig = activePlotlyCharts.box_plots[colName];
+            } else if (key.startsWith('cat_num__')) {
+                const parts = key.split('__');
+                const cat = parts[1];
+                const num = parts[2];
+                chartConfig = activePlotlyCharts.cat_num_relationships[cat][num];
             }
 
             if (chartConfig) {
@@ -371,7 +436,7 @@ function renderDashboardCharts() {
         } else {
             container.innerHTML = `
                 <div class="flex items-center justify-center h-full text-slate-500 text-xs">
-                    <span>No matching statistical relationship to plot in this panel.</span>
+                    <span>No analytical chart available for this slot.</span>
                 </div>
             `;
         }

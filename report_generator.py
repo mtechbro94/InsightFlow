@@ -432,29 +432,87 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
                 return;
             }}
 
-            // Map charts to targets
-            let chartKeys = [];
-            if (plotlyCharts.correlation_heatmap) chartKeys.push('correlation_heatmap');
-            if (plotlyCharts.scatter_relation) chartKeys.push('scatter_relation');
-            
-            // Gather distributions
-            if (plotlyCharts.distributions) {{
-                Object.keys(plotlyCharts.distributions).forEach(k => chartKeys.push(`distributions__\${{k}}`));
-            }}
-            if (plotlyCharts.categorical) {{
-                Object.keys(plotlyCharts.categorical).forEach(k => chartKeys.push(`categorical__\${{k}}`));
-            }}
-            if (plotlyCharts.time_series) {{
-                Object.keys(plotlyCharts.time_series).forEach(k => chartKeys.push(`time_series__\${{k}}`));
+            // Design intelligent slots for the 4 charts
+            let slots = [null, null, null, null];
+
+            // 1. Time Series / Trend (Slot 1 Priority)
+            if (plotlyCharts.time_series && Object.keys(plotlyCharts.time_series).length > 0) {{
+                const key = Object.keys(plotlyCharts.time_series)[0];
+                slots[0] = `time_series__\${{key}}`;
             }}
 
-            // Render up to 4 charts
+            // 2. Business Category Aggregations (Slot 2 Priority)
+            if (plotlyCharts.cat_num_relationships && Object.keys(plotlyCharts.cat_num_relationships).length > 0) {{
+                const cat = Object.keys(plotlyCharts.cat_num_relationships)[0];
+                const num = Object.keys(plotlyCharts.cat_num_relationships[cat])[0];
+                slots[1] = `cat_num__\${{cat}}__\${{num}}`;
+            }} else if (plotlyCharts.categorical && Object.keys(plotlyCharts.categorical).length > 0) {{
+                const key = Object.keys(plotlyCharts.categorical)[0];
+                slots[1] = `categorical__\${{key}}`;
+            }}
+
+            // 3. Correlations & Scatter (Slot 3 Priority)
+            if (plotlyCharts.correlation_heatmap) {{
+                slots[2] = 'correlation_heatmap';
+            }} else if (plotlyCharts.scatter_relation) {{
+                slots[2] = 'scatter_relation';
+            }} else if (plotlyCharts.distributions && Object.keys(plotlyCharts.distributions).length > 0) {{
+                const key = Object.keys(plotlyCharts.distributions)[0];
+                slots[2] = `distributions__\${{key}}`;
+            }}
+
+            // 4. Outliers Box Plot / Secondary Distribution (Slot 4 Priority)
+            if (plotlyCharts.box_plots && Object.keys(plotlyCharts.box_plots).length > 0) {{
+                const key = Object.keys(plotlyCharts.box_plots)[0];
+                slots[3] = `box_plots__\${{key}}`;
+            }} else if (plotlyCharts.distributions && Object.keys(plotlyCharts.distributions).length > 1) {{
+                const key = Object.keys(plotlyCharts.distributions)[1];
+                slots[3] = `distributions__\${{key}}`;
+            }}
+
+            // Accumulate all available charts to backfill empty slots
+            let allAvailable = [];
+            if (plotlyCharts.correlation_heatmap) allAvailable.push('correlation_heatmap');
+            if (plotlyCharts.scatter_relation) allAvailable.push('scatter_relation');
+            if (plotlyCharts.time_series) {{
+                Object.keys(plotlyCharts.time_series).forEach(k => allAvailable.push(`time_series__\${{k}}`));
+            }}
+            if (plotlyCharts.cat_num_relationships) {{
+                Object.keys(plotlyCharts.cat_num_relationships).forEach(cat => {{
+                    Object.keys(plotlyCharts.cat_num_relationships[cat]).forEach(num => {{
+                        allAvailable.push(`cat_num__\${{cat}}__\${{num}}`);
+                    }});
+                }});
+            }}
+            if (plotlyCharts.categorical) {{
+                Object.keys(plotlyCharts.categorical).forEach(k => allAvailable.push(`categorical__\${{k}}`));
+            }}
+            if (plotlyCharts.distributions) {{
+                Object.keys(plotlyCharts.distributions).forEach(k => allAvailable.push(`distributions__\${{k}}`));
+            }}
+            if (plotlyCharts.box_plots) {{
+                Object.keys(plotlyCharts.box_plots).forEach(k => allAvailable.push(`box_plots__\${{k}}`));
+            }}
+
+            // Fill in empty slots with unused available charts
+            for (let i = 0; i < 4; i++) {{
+                if (slots[i] === null) {{
+                    const nextUnused = allAvailable.find(k => !slots.includes(k));
+                    if (nextUnused) {{
+                        slots[i] = nextUnused;
+                    }}
+                }}
+            }}
+
+            // Filter out nulls
+            const finalSlots = slots.filter(s => s !== null);
+
             targets.forEach((targetId, idx) => {{
                 const targetEl = document.getElementById(targetId);
                 targetEl.innerHTML = '';
                 
-                if (idx < chartKeys.length) {{
-                    const key = chartKeys[idx];
+                if (idx < finalSlots.length) {{
+                    const key = finalSlots[idx];
                     let plotData = null;
 
                     if (key === 'correlation_heatmap') {{
@@ -470,6 +528,14 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
                     }} else if (key.startsWith('time_series__')) {{
                         const colName = key.split('__')[1];
                         plotData = plotlyCharts.time_series[colName];
+                    }} else if (key.startsWith('box_plots__')) {{
+                        const colName = key.split('__')[1];
+                        plotData = plotlyCharts.box_plots[colName];
+                    }} else if (key.startsWith('cat_num__')) {{
+                        const parts = key.split('__');
+                        const cat = parts[1];
+                        const num = parts[2];
+                        plotData = plotlyCharts.cat_num_relationships[cat][num];
                     }}
 
                     if (plotData) {{
@@ -555,6 +621,36 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
                 // Remove OLS trendline on filtering for simplicity, as computing OLS client-side is complex
                 if (plotObj.data && plotObj.data[1]) {{
                     plotObj.data.splice(1, 1);
+                }}
+            }} else if (chartKey.startsWith('cat_num__')) {{
+                const parts = chartKey.split('__');
+                const catCol = parts[1];
+                const numCol = parts[2];
+                
+                // Recalculate group averages
+                let sums = {{}};
+                let counts = {{}};
+                filteredData.forEach(d => {{
+                    const catVal = String(d[catCol]);
+                    const numVal = Number(d[numCol]);
+                    if (!isNaN(numVal)) {{
+                        sums[catVal] = (sums[catVal] || 0) + numVal;
+                        counts[catVal] = (counts[catVal] || 0) + 1;
+                    }}
+                }});
+                
+                // Calculate averages
+                let groupedData = Object.keys(sums).map(cat => ({{
+                    category: cat,
+                    mean: counts[cat] > 0 ? (sums[cat] / counts[cat]) : 0
+                }}));
+                
+                // Sort by mean descending
+                groupedData.sort((a, b) => b.mean - a.mean);
+                
+                if (plotObj.data && plotObj.data[0]) {{
+                    plotObj.data[0].x = groupedData.map(g => g.category);
+                    plotObj.data[0].y = groupedData.map(g => g.mean);
                 }}
             }}
             return plotObj;
