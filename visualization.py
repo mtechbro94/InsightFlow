@@ -38,7 +38,7 @@ def is_meaningful_column(col_name, info):
         
     return not is_blacklisted
 
-def generate_interactive_plots(df, eda_results, columns_info):
+def generate_interactive_plots(df, eda_results, columns_info, kpis=None):
     """
     Generates interactive Plotly visualizations, prioritizing business aggregations,
     trends over time, and individual metric distributions. 
@@ -49,6 +49,12 @@ def generate_interactive_plots(df, eda_results, columns_info):
     # Filter for meaningful columns
     numeric_cols = [c for c, info in columns_info.items() if info.get('inferred_type') == 'numeric' and is_meaningful_column(c, info)]
     cat_cols = [c for c, info in columns_info.items() if info.get('inferred_type') == 'categorical' and is_meaningful_column(c, info)]
+    
+    # Filter numeric columns to KPI columns only if kpis is provided
+    if kpis:
+        kpi_columns = {k['column'] for k in kpis if k.get('column') is not None}
+        if kpi_columns:
+            numeric_cols = [c for c in numeric_cols if c in kpi_columns]
     
     # 1. Time-Series Trends (Line charts)
     ts_data = eda_results.get('time_series')
@@ -180,7 +186,7 @@ def generate_interactive_plots(df, eda_results, columns_info):
 
     return plots
 
-def generate_static_plots(df, eda_results, columns_info, output_dir):
+def generate_static_plots(df, eda_results, columns_info, output_dir, kpis=None):
     """
     Generates static PNG plots to embed in the PDF analytical report.
     Only creates meaningful, non-scatter, non-heatmap charts.
@@ -190,6 +196,12 @@ def generate_static_plots(df, eda_results, columns_info, output_dir):
 
     numeric_cols = [c for c, info in columns_info.items() if info.get('inferred_type') == 'numeric' and is_meaningful_column(c, info)]
     cat_cols = [c for c, info in columns_info.items() if info.get('inferred_type') == 'categorical' and is_meaningful_column(c, info)]
+    
+    # Filter numeric columns to KPI columns only if kpis is provided
+    if kpis:
+        kpi_columns = {k['column'] for k in kpis if k.get('column') is not None}
+        if kpi_columns:
+            numeric_cols = [c for c in numeric_cols if c in kpi_columns]
     
     # Set styling parameters for report aesthetics
     plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.available else 'default')

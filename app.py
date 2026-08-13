@@ -172,15 +172,16 @@ def api_analyze():
             kpis
         )
         
-        # Generate Interactive Plotly figures
-        plotly_charts = visualization.generate_interactive_plots(df, eda_results, active_profile['columns'])
+        # Generate Interactive Plotly figures (Passing detected kpis to restrict numerical variables)
+        plotly_charts = visualization.generate_interactive_plots(df, eda_results, active_profile['columns'], kpis=kpis)
         
         # Generate Static Matplotlib PNGs for the PDF
         static_charts = visualization.generate_static_plots(
             df, 
             eda_results, 
             active_profile['columns'], 
-            app.config['STATIC_CHARTS_FOLDER']
+            app.config['STATIC_CHARTS_FOLDER'],
+            kpis=kpis
         )
         
         # Store in state
