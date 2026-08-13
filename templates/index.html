@@ -275,6 +275,66 @@
                 </div>
             </div>
 
+            <!-- AI Copilot Conversational Analyst -->
+            <div class="bg-slate-900 border border-slate-850 rounded-3xl p-6 shadow-xl flex flex-col space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                    <h3 class="text-lg font-bold flex items-center">
+                        <svg class="w-5 h-5 text-indigo-400 mr-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                        Interactive AI Copilot Analyst
+                    </h3>
+                    <span class="text-xs text-slate-500">Ask questions, request filters, or generate custom charts</span>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px]">
+                    <!-- Chat feed (takes 2 cols on desktop) -->
+                    <div class="lg:col-span-2 flex flex-col h-full bg-slate-950/50 rounded-2xl border border-slate-850 p-4">
+                        <div id="chat-messages-container" class="flex-1 overflow-y-auto space-y-4 pr-2 text-sm">
+                            <!-- System Welcome message -->
+                            <div class="flex items-start space-x-3">
+                                <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+                                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl px-4 py-2.5 max-w-[85%] text-slate-300">
+                                    Hello! I am your **InsightFlow AI Analyst**. You can ask me custom questions about your loaded dataset. E.g.:
+                                    <ul class="list-disc list-inside mt-2 space-y-1 text-slate-400 text-xs">
+                                        <li><em>"Show a bar chart of average Revenue by Product"</em></li>
+                                        <li><em>"Are there any outliers in the data?"</em></li>
+                                        <li><em>"Which region has the highest profit?"</em></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Input Bar -->
+                        <div class="mt-4 flex items-center gap-2">
+                            <input type="text" id="chat-user-input" onkeydown="if(event.key === 'Enter') sendChatMessage()" placeholder="Ask me about this data..." class="flex-1 bg-slate-900 text-slate-200 text-sm px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors">
+                            <button onclick="sendChatMessage()" class="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all font-semibold text-sm shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat suggestions & quick metrics (takes 1 col) -->
+                    <div class="flex flex-col h-full justify-between bg-slate-950/20 border border-slate-850 rounded-2xl p-4">
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Suggested Queries</h4>
+                            <div class="flex flex-col gap-2">
+                                <button onclick="quickChatQuery('Show average revenue by product')" class="text-left text-xs bg-slate-900/50 hover:bg-indigo-950/30 border border-slate-800 hover:border-indigo-500/50 p-2.5 rounded-xl text-slate-300 transition-all">
+                                    📊 "Show average revenue by product"
+                                </button>
+                                <button onclick="quickChatQuery('Summary of data outliers')" class="text-left text-xs bg-slate-900/50 hover:bg-indigo-950/30 border border-slate-800 hover:border-indigo-500/50 p-2.5 rounded-xl text-slate-300 transition-all">
+                                    🔍 "Summary of data outliers"
+                                </button>
+                                <button onclick="quickChatQuery('Show product purchase counts')" class="text-left text-xs bg-slate-900/50 hover:bg-indigo-950/30 border border-slate-800 hover:border-indigo-500/50 p-2.5 rounded-xl text-slate-300 transition-all">
+                                    📈 "Show product purchase counts"
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-slate-500 leading-relaxed border-t border-slate-900 pt-4">
+                            The AI Copilot writes and runs secure sandboxed Python scripts locally to generate highly precise aggregates and charts.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Visualization Grid -->
             <div>
                 <h2 class="text-lg font-bold tracking-tight mb-4 flex items-center">

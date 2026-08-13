@@ -526,3 +526,128 @@ function changePage(direction) {
     tablePage += direction;
     renderTableExplorer();
 }
+
+// 7. AI Copilot Chat Functions
+function quickChatQuery(q) {
+    document.getElementById('chat-user-input').value = q;
+    sendChatMessage();
+}
+
+async function sendChatMessage() {
+    const inputEl = document.getElementById('chat-user-input');
+    const message = inputEl.value.trim();
+    if (!message) return;
+
+    inputEl.value = '';
+
+    const container = document.getElementById('chat-messages-container');
+
+    // Append User Message
+    const userMsgDiv = document.createElement('div');
+    userMsgDiv.className = 'flex items-start space-x-3 justify-end';
+    userMsgDiv.innerHTML = `
+        <div class="bg-indigo-600 text-white rounded-2xl px-4 py-2.5 max-w-[85%]">
+            ${message}
+        </div>
+        <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">ME</div>
+    `;
+    container.appendChild(userMsgDiv);
+    container.scrollTop = container.scrollHeight;
+
+    // Append Typing Indicator
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'flex items-start space-x-3';
+    typingDiv.id = 'chat-typing-indicator';
+    typingDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 animate-pulse">AI</div>
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl px-4 py-2.5 text-slate-400 text-xs flex items-center space-x-2">
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+            <span>Running analysis script...</span>
+        </div>
+    `;
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: message })
+        });
+
+        const result = await response.json();
+
+        // Remove typing indicator
+        const indicator = document.getElementById('chat-typing-indicator');
+        if (indicator) indicator.remove();
+
+        if (!response.ok) {
+            appendChatBotMessage("Error: Failed to process your analysis query.");
+            return;
+        }
+
+        // Render Bot Message
+        const botMsgDiv = document.createElement('div');
+        botMsgDiv.className = 'flex items-start space-x-3';
+        
+        // Generate a random unique ID for dynamic Plotly chart inside chat bubble if present
+        const chartId = 'chat-chart-' + Math.random().toString(36).substring(2, 9);
+        
+        let messageHtml = `
+            <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+            <div class="bg-slate-900 border border-slate-800/80 rounded-2xl px-4 py-2.5 max-w-[85%] text-slate-300 space-y-3 leading-relaxed">
+                <div>${formatMarkdownText(result.text_answer)}</div>
+                ${result.plotly_chart_data ? `<div id="${chartId}" class="w-full min-h-[220px] bg-slate-950/80 rounded-xl p-2 mt-3 border border-slate-850"></div>` : ''}
+            </div>
+        `;
+        botMsgDiv.innerHTML = messageHtml;
+        container.appendChild(botMsgDiv);
+        container.scrollTop = container.scrollHeight;
+
+        // If Plotly data is returned, draw the chart inside the chat bubble
+        if (result.plotly_chart_data) {
+            setTimeout(() => {
+                const chartConfig = result.plotly_chart_data;
+                // Force a small height and clean margins for chat-bubble aesthetics
+                chartConfig.layout.height = 220;
+                chartConfig.layout.margin = { l: 35, r: 15, t: 30, b: 35 };
+                chartConfig.layout.showlegend = false;
+                Plotly.newPlot(chartId, chartConfig.data, chartConfig.layout, { responsive: true, displayModeBar: false });
+            }, 50);
+        }
+
+    } catch (e) {
+        const indicator = document.getElementById('chat-typing-indicator');
+        if (indicator) indicator.remove();
+        appendChatBotMessage("Communication exception: " + e.message);
+    }
+}
+
+function appendChatBotMessage(text) {
+    const container = document.getElementById('chat-messages-container');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'flex items-start space-x-3';
+    msgDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+        <div class="bg-slate-900 border border-slate-800/80 rounded-2xl px-4 py-2.5 max-w-[85%] text-slate-300">
+            ${text}
+        </div>
+    `;
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+// Basic helper to convert markdown bold/bullet indicators in response text
+function formatMarkdownText(text) {
+    if (!text) return "";
+    return text
+        .replace(/\*\*(.*?)\*\//g, '<strong>$1</strong>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code class="bg-slate-950 px-1 rounded text-pink-400 font-mono">$1</code>')
+        .replace(/\n/g, '<br>');
+}
