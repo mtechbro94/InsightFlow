@@ -55,6 +55,14 @@ def convert_to_csv(file_path, original_filename):
         else:
             raise ValueError(f"Unsupported file format '{ext}'. Supported formats: CSV, Excel, JSON, TSV.")
 
+        # Drop completely empty columns (all NaN)
+        df = df.dropna(how='all', axis=1)
+        
+        # Drop columns that start with "Unnamed:" and are mostly empty or have <= 1 unique value
+        unnamed_cols = [c for c in df.columns if str(c).startswith('Unnamed:') and (df[c].isnull().sum() / len(df) > 0.5 or df[c].nunique() <= 1)]
+        if unnamed_cols:
+            df = df.drop(columns=unnamed_cols)
+
         # Validate that the conversion resulted in a non-empty dataframe
         if df.empty:
             raise ValueError("The uploaded dataset contains no records.")

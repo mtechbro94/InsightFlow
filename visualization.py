@@ -32,8 +32,8 @@ def is_meaningful_column(col_name, info):
         for term in blacklisted_terms
     )
     
-    # Exclude ID inferred types
-    if info.get('inferred_type') in ['id', 'text', 'empty', 'datetime']:
+    # Exclude ID inferred types or columns with 0 or 1 unique values (no variance/useless)
+    if info.get('inferred_type') in ['id', 'text', 'empty', 'datetime'] or info.get('unique_count', 0) <= 1:
         return False
         
     return not is_blacklisted
