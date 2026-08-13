@@ -173,7 +173,7 @@ def profile_dataset(df):
         'columns': columns_info
     }
 
-def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=True):
+def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=True, outlier_multiplier=1.5):
     """
     Cleans the dataset by removing duplicates, imputing missing values,
     and identifying numerical outliers.
@@ -197,7 +197,7 @@ def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=
         if null_count == 0:
             continue
             
-        # If column is mostly null (> 80%), log warning but don't drop unless requested
+        # If column is mostly null (> 80%), log warning
         null_pct = (null_count / len(df)) * 100
         if null_pct > 80:
             cleaning_log.append(f"Warning: Column '{col}' is {null_pct:.1f}% empty.")
@@ -208,7 +208,10 @@ def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=
             cleaning_log.append(f"Filled {null_count} missing values in text/ID column '{col}' with 'Unknown'.")
         
         elif inf_type == 'numeric':
-            if imputation_strategy in ['auto', 'mean']:
+            if imputation_strategy == 'disabled':
+                # Skip numeric imputation
+                continue
+            elif imputation_strategy in ['auto', 'mean']:
                 mean_val = cleaned_df[col].mean()
                 # If int column, round the mean
                 if cleaned_df[col].dtype in ['int64', 'int32']:
@@ -245,8 +248,8 @@ def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=
                 q1 = col_series.quantile(0.25)
                 q3 = col_series.quantile(0.75)
                 iqr = q3 - q1
-                lower_bound = q1 - 1.5 * iqr
-                upper_bound = q3 + 1.5 * iqr
+                lower_bound = q1 - outlier_multiplier * iqr
+                upper_bound = q3 + outlier_multiplier * iqr
                 
                 outlier_mask = (col_series < lower_bound) | (col_series > upper_bound)
                 num_outliers = int(outlier_mask.sum())
@@ -261,7 +264,7 @@ def clean_dataset(df, columns_info, imputation_strategy='auto', drop_duplicates=
                         'min': float(col_series.min()),
                         'max': float(col_series.max())
                     }
-                    cleaning_log.append(f"Detected {num_outliers} outliers ({pct_outliers:.1f}%) in numerical column '{col}' using IQR method (bounds: [{lower_bound:.2f}, {upper_bound:.2f}]).")
+                    cleaning_log.append(f"Detected {num_outliers} outliers ({pct_outliers:.1f}%) in numerical column '{col}' using IQR method (bounds: [{lower_bound:.2f}, {upper_bound:.2f}] with {outlier_multiplier}x sensitivity).")
 
     return cleaned_df, cleaning_log, outliers_info
 

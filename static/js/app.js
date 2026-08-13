@@ -4,6 +4,43 @@ let currentCleanLogs = [];
 let datasetProfile = null;
 let activeDashboardData = null;
 
+// Dashboard Themes configurations
+let currentTheme = 'cyberpunk';
+const THEMES = {
+    cyberpunk: {
+        primary: '#6366f1',
+        secondary: '#ec4899',
+        grid: '#1e293b',
+        text: '#94a3b8',
+        bodyBg: '#0b0f19',
+        cardBg: '#0f172a'
+    },
+    emerald: {
+        primary: '#10b981',
+        secondary: '#14b8a6',
+        grid: '#064e3b',
+        text: '#a7f3d0',
+        bodyBg: '#021e17',
+        cardBg: '#022c22'
+    },
+    retro: {
+        primary: '#f59e0b',
+        secondary: '#d97706',
+        grid: '#292524',
+        text: '#f7fee7',
+        bodyBg: '#141210',
+        cardBg: '#1c1917'
+    },
+    slate: {
+        primary: '#cbd5e1',
+        secondary: '#94a3b8',
+        grid: '#334155',
+        text: '#cbd5e1',
+        bodyBg: '#0f172a',
+        cardBg: '#1e293b'
+    }
+};
+
 // Dashboard Tab management
 let activeInsightTab = 'business';
 let activePlotlyCharts = {};
@@ -113,6 +150,7 @@ function buildColumnsProfileGrid(columns) {
 async function executeCleaningPipeline() {
     const imputation = document.getElementById('setting-imputation').value;
     const dropDuplicates = document.getElementById('setting-duplicates').checked;
+    const outlierMultiplier = parseFloat(document.getElementById('setting-outliers').value);
 
     showSpinner("Running Data Cleaning Pipeline...");
 
@@ -122,7 +160,8 @@ async function executeCleaningPipeline() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 imputation_strategy: imputation,
-                drop_duplicates: dropDuplicates
+                drop_duplicates: dropDuplicates,
+                outlier_multiplier: outlierMultiplier
             })
         });
 
@@ -431,7 +470,49 @@ function renderDashboardCharts() {
             }
 
             if (chartConfig) {
-                Plotly.newPlot(targetId, chartConfig.data, chartConfig.layout, { responsive: true });
+                // Apply theme modifications dynamically on deep-cloned layout/data
+                const themedLayout = JSON.parse(JSON.stringify(chartConfig.layout || {}));
+                const themedData = JSON.parse(JSON.stringify(chartConfig.data || []));
+                
+                const theme = THEMES[currentTheme];
+                themedLayout.paper_bgcolor = 'rgba(0,0,0,0)';
+                themedLayout.plot_bgcolor = 'rgba(0,0,0,0)';
+                themedLayout.font = { color: theme.text, family: 'Outfit, sans-serif' };
+                
+                if (themedLayout.xaxis) {
+                    themedLayout.xaxis.gridcolor = theme.grid;
+                    themedLayout.xaxis.linecolor = theme.grid;
+                }
+                if (themedLayout.yaxis) {
+                    themedLayout.yaxis.gridcolor = theme.grid;
+                    themedLayout.yaxis.linecolor = theme.grid;
+                }
+                
+                themedData.forEach(trace => {
+                    if (trace.marker) {
+                        if (trace.type === 'heatmap') {
+                            if (currentTheme === 'emerald') {
+                                trace.colorscale = 'Viridis';
+                            } else if (currentTheme === 'retro') {
+                                trace.colorscale = 'Hot';
+                            } else if (currentTheme === 'slate') {
+                                trace.colorscale = 'Greys';
+                            } else {
+                                trace.colorscale = 'Portland';
+                            }
+                        } else {
+                            trace.marker.color = theme.primary;
+                            if (trace.marker.line) {
+                                trace.marker.line.color = theme.primary;
+                            }
+                        }
+                    }
+                    if (trace.line) {
+                        trace.line.color = theme.primary;
+                    }
+                });
+                
+                Plotly.newPlot(targetId, themedData, themedLayout, { responsive: true });
             }
         } else {
             container.innerHTML = `
@@ -455,11 +536,17 @@ async function renderTableExplorer() {
     if (!datasetMetadata || !datasetMetadata.columns) return;
     const columns = Object.keys(datasetMetadata.columns);
     
-    // Draw columns headers
+    // Draw columns headers (Clickable to inspect)
     columns.forEach(col => {
         const th = document.createElement('th');
-        th.className = 'px-6 py-3 font-semibold text-slate-200';
-        th.textContent = col;
+        th.className = 'px-6 py-3 font-semibold text-indigo-400 hover:text-indigo-300 cursor-pointer hover:bg-slate-850/50 transition-colors uppercase tracking-wider text-xs';
+        th.setAttribute('onclick', `openColumnInspector('${col.replace(/'/g, "\\'")}')`);
+        th.innerHTML = `
+            <div class="flex items-center space-x-1 justify-between">
+                <span>${col}</span>
+                <svg class="w-3 h-3 opacity-50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            </div>
+        `;
         thead.appendChild(th);
     });
 
@@ -650,4 +737,178 @@ function formatMarkdownText(text) {
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code class="bg-slate-950 px-1 rounded text-pink-400 font-mono">$1</code>')
         .replace(/\n/g, '<br>');
+}
+
+// 8. Column Detail Inspector
+async function openColumnInspector(colName) {
+    if (!activeDashboardData) return;
+
+    // Show modal
+    const modal = document.getElementById('inspector-modal');
+    modal.classList.remove('hidden');
+
+    // Get metadata from datasetMetadata
+    const metadata = activeDashboardData.datasetMetadata || {};
+    const colInfo = metadata.columns ? metadata.columns[colName] : {};
+    const inferredType = colInfo.inferred_type || 'Unknown';
+    const nullsCount = colInfo.null_count || 0;
+    const nullsPct = colInfo.null_pct || 0.0;
+    const uniqueCount = colInfo.unique_count || 0;
+
+    // Outlier count
+    const outliersObj = activeDashboardData.outliers || {};
+    const colOutliers = outliersObj[colName] || null;
+    const outlierCount = colOutliers ? colOutliers.count : 0;
+
+    // Populate header & top cards
+    document.getElementById('inspector-column-name').innerText = colName;
+    document.getElementById('inspector-type').innerText = inferredType.charAt(0).toUpperCase() + inferredType.slice(1);
+    document.getElementById('inspector-nulls').innerText = `${nullsCount} (${nullsPct.toFixed(1)}%)`;
+    document.getElementById('inspector-unique').innerText = uniqueCount.toLocaleString();
+    
+    const outlierEl = document.getElementById('inspector-outliers');
+    if (outlierCount > 0) {
+        outlierEl.innerText = `${outlierCount} flagged`;
+        outlierEl.className = 'text-sm font-bold text-amber-400 mt-1 block';
+    } else {
+        outlierEl.innerText = '0 flagged';
+        outlierEl.className = 'text-sm font-bold text-slate-400 mt-1 block';
+    }
+
+    // Populate stats table
+    const tableBody = document.getElementById('inspector-stats-table');
+    tableBody.innerHTML = '';
+
+    const eda = activeDashboardData.eda || {};
+
+    if (inferredType === 'numeric') {
+        const stats = eda.numerical ? eda.numerical[colName] : null;
+        if (stats) {
+            const rows = [
+                { name: 'Mean Average', val: stats.mean.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) },
+                { name: 'Median Value', val: stats.median.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) },
+                { name: 'Minimum', val: stats.min.toLocaleString() },
+                { name: 'Maximum', val: stats.max.toLocaleString() },
+                { name: 'Range Bounds', val: stats.range.toLocaleString() },
+                { name: 'Standard Deviation (Std)', val: stats.std.toFixed(4) },
+                { name: 'Variance', val: stats.var.toFixed(4) },
+                { name: 'Skewness (Symmetry)', val: stats.skewness ? stats.skewness.toFixed(4) : '0.0000' },
+                { name: 'Kurtosis (Peak)', val: stats.kurtosis ? stats.kurtosis.toFixed(4) : '0.0000' }
+            ];
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2.5 text-left text-slate-400 font-medium">${r.name}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold text-slate-200">${r.val}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+    } else if (inferredType === 'categorical' || inferredType === 'boolean') {
+        const stats = eda.categorical ? eda.categorical[colName] : null;
+        if (stats && stats.distribution) {
+            // Sort categories by counts
+            const dist = Object.entries(stats.distribution).sort((a, b) => b[1].count - a[1].count);
+            dist.forEach(([cat, data]) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2.5 text-left text-slate-400 font-medium">${cat}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold text-slate-200">${data.count.toLocaleString()} (${data.pct.toFixed(1)}%)</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+    } else {
+        const sampleVals = colInfo.sample_values || [];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-4 py-2.5 text-left text-slate-400 font-medium">Sample Values</td>
+            <td class="px-4 py-2.5 text-right font-semibold text-slate-200">${sampleVals.slice(0, 5).join(', ')}</td>
+        `;
+        tableBody.appendChild(tr);
+    }
+
+    // Fetch and plot chart preview
+    const chartDiv = document.getElementById('inspector-chart');
+    chartDiv.innerHTML = '<span class="text-slate-400 text-xs animate-pulse">Loading distribution data...</span>';
+
+    try {
+        const response = await fetch(`/api/column/${encodeURIComponent(colName)}`);
+        const result = await response.json();
+        
+        if (!response.ok) {
+            chartDiv.innerHTML = '<span class="text-red-500 text-xs">Failed to load chart data.</span>';
+            return;
+        }
+
+        const values = result.values;
+        chartDiv.innerHTML = ''; // Clear loading text
+
+        let plotlyData = [];
+        let plotlyLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            height: 240,
+            margin: { l: 40, r: 20, t: 20, b: 40 },
+            font: { color: '#94a3b8', size: 10 },
+            xaxis: { gridcolor: '#1e293b', linecolor: '#1e293b' },
+            yaxis: { gridcolor: '#1e293b', linecolor: '#1e293b' }
+        };
+
+        if (inferredType === 'numeric') {
+            plotlyData = [{
+                x: values,
+                type: 'histogram',
+                marker: { color: '#6366f1', opacity: 0.8 }
+            }];
+            plotlyLayout.xaxis.title = 'Value Bins';
+            plotlyLayout.yaxis.title = 'Frequency';
+        } else {
+            // Count unique items manually
+            const counts = {};
+            values.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+            const sortedCounts = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            
+            plotlyData = [{
+                x: sortedCounts.map(item => item[0]),
+                y: sortedCounts.map(item => item[1]),
+                type: 'bar',
+                marker: { color: '#ec4899', opacity: 0.8 }
+            }];
+            plotlyLayout.xaxis.title = 'Categories';
+            plotlyLayout.yaxis.title = 'Count';
+        }
+
+        Plotly.newPlot('inspector-chart', plotlyData, plotlyLayout, { responsive: true, displayModeBar: false });
+
+    } catch (err) {
+        chartDiv.innerHTML = `<span class="text-red-500 text-xs">Error drawing preview: ${err.message}</span>`;
+    }
+}
+
+function closeColumnInspector() {
+    document.getElementById('inspector-modal').classList.add('hidden');
+}
+
+// 9. Dashboard Theme Manager
+function changeDashboardTheme(themeName) {
+    if (!THEMES[themeName]) return;
+    currentTheme = themeName;
+    const theme = THEMES[themeName];
+
+    // Apply color variables to document elements
+    document.documentElement.style.setProperty('--body-bg', theme.bodyBg);
+    document.documentElement.style.setProperty('--card-bg', theme.cardBg);
+    
+    // Body background overwrite
+    document.body.style.backgroundColor = theme.bodyBg;
+    
+    // Update all cards, panels, and custom items
+    const themeCards = document.querySelectorAll('.bg-slate-900, .bg-slate-955\\/60');
+    themeCards.forEach(card => {
+        card.style.backgroundColor = theme.cardBg;
+    });
+
+    // Re-render dashboard visualizations with new colors
+    renderDashboardCharts();
 }

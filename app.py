@@ -108,6 +108,7 @@ def api_clean():
     data = request.json or {}
     imputation_strategy = data.get('imputation_strategy', 'auto')
     drop_duplicates = data.get('drop_duplicates', True)
+    outlier_multiplier = float(data.get('outlier_multiplier', 1.5))
 
     try:
         # Load converted CSV
@@ -118,7 +119,8 @@ def api_clean():
             df, 
             session_state['profile']['columns'],
             imputation_strategy=imputation_strategy,
-            drop_duplicates=drop_duplicates
+            drop_duplicates=drop_duplicates,
+            outlier_multiplier=outlier_multiplier
         )
         
         # Save Cleaned CSV
@@ -490,6 +492,33 @@ def api_chat():
             'text_answer': text_answer,
             'plotly_chart_data': None
         })
+
+@app.route('/api/column/<col_name>', methods=['GET'])
+def api_column_values(col_name):
+    """Returns sample values for dynamic column profiling in the inspector modal."""
+    active_csv_path = session_state['cleaned_csv_path'] or session_state['converted_csv_path']
+    if not active_csv_path or not os.path.exists(active_csv_path):
+        return jsonify({'error': 'No dataset loaded.'}), 400
+    
+    try:
+        df = pd.read_csv(active_csv_path)
+        if col_name not in df.columns:
+            return jsonify({'error': f"Column '{col_name}' not found."}), 404
+        
+        # Return downsampled data for fast Plotly charting (max 2000 records)
+        series = df[col_name].dropna()
+        sample_size = min(2000, len(series))
+        values = series.sample(n=sample_size, random_state=42).tolist() if len(series) > sample_size else series.tolist()
+        
+        # Convert non-standard datatypes for JSON compliance
+        values = [float(v) if isinstance(v, (int, float)) and not pd.isna(v) else str(v) for v in values]
+        
+        return jsonify({
+            'column': col_name,
+            'values': values
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Start on standard port 5000
