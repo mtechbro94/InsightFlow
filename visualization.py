@@ -107,7 +107,6 @@ def generate_interactive_plots(df, eda_results, columns_info):
         top_corr = strong_corrs[0]
         fig = px.scatter(
             df, x=top_corr['col1'], y=top_corr['col2'],
-            trendline="ols",
             title=f"Scatter Plot: {top_corr['col1']} vs {top_corr['col2']} (r = {top_corr['coefficient']:.2f})",
             template="plotly_dark",
             color_discrete_sequence=['#3b82f6']
