@@ -26,7 +26,7 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Plotly.js CDN -->
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.1/plotly.min.js"></script>
     <script>
         tailwind.config = {{
             darkMode: 'class',
@@ -416,6 +416,22 @@ def generate_html_dashboard(df, cleaned_df, metadata, eda_results, insights, kpi
             // Target Chart Div IDs
             const targets = ['chart-panel-1', 'chart-panel-2', 'chart-panel-3', 'chart-panel-4'];
             
+            // Check if Plotly library loaded correctly
+            if (typeof Plotly === 'undefined') {{
+                console.error("Plotly is not loaded");
+                targets.forEach(targetId => {{
+                    const container = document.getElementById(targetId);
+                    if (container) {{
+                        container.innerHTML = `
+                            <div class="flex flex-col items-center justify-center h-full text-red-400 text-xs p-6 text-center">
+                                <svg class="w-8 h-8 mb-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <span>Plotly library failed to load. Please verify your internet connection.</span>
+                            </div>`;
+                    }}
+                }});
+                return;
+            }}
+
             // Map charts to targets
             let chartKeys = [];
             if (plotlyCharts.correlation_heatmap) chartKeys.push('correlation_heatmap');
