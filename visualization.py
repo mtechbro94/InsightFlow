@@ -126,7 +126,35 @@ def generate_interactive_plots(df, eda_results, columns_info):
         fig.update_layout(margin=dict(l=40, r=40, t=50, b=40))
         plots['categorical'][col] = json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
-    # 4. Numerical Distributions (Histograms)
+    # 4. Correlation Heatmap (Allowed numeric-numeric chart)
+    corr_info = eda_results['relationships'].get('correlations', {})
+    if corr_info and 'matrix' in corr_info:
+        matrix = corr_info['matrix']
+        cols = [c for c in matrix.keys() if is_meaningful_column(c, columns_info.get(c, {}))]
+        
+        # Only draw if we have at least 2 meaningful numeric columns
+        if len(cols) >= 2:
+            z_values = [[matrix[c1][c2] for c2 in cols] for c1 in cols]
+            
+            fig = go.Figure(data=go.Heatmap(
+                z=z_values,
+                x=cols,
+                y=cols,
+                colorscale='RdBu',
+                zmin=-1, zmax=1,
+                text=np.round(z_values, 2),
+                texttemplate="%{text}",
+                hoverongaps = False
+            ))
+            fig.update_layout(
+                title="Correlation Matrix",
+                template="plotly_dark",
+                margin=dict(l=40, r=40, t=50, b=40),
+                xaxis={'tickangle': -45}
+            )
+            plots['correlation_heatmap'] = json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
+
+    # 5. Numerical Distributions (Histograms)
     plots['distributions'] = {}
     for col in numeric_cols[:3]:
         fig = px.histogram(
@@ -218,7 +246,37 @@ def generate_static_plots(df, eda_results, columns_info, output_dir):
                     plt.close()
                     paths['categorical_numerical_relationship'] = rel_path
 
-    # 3. Numerical Distributions
+    # 3. Correlation Heatmap (Allowed numeric-numeric chart)
+    corr_info = eda_results['relationships'].get('correlations', {})
+    if corr_info and 'matrix' in corr_info:
+        matrix_dict = corr_info['matrix']
+        cols = [c for c in matrix_dict.keys() if is_meaningful_column(c, columns_info.get(c, {}))]
+        
+        if len(cols) >= 2:
+            matrix_data = [[matrix_dict[c1][c2] for c2 in cols] for c1 in cols]
+            
+            fig, ax = plt.subplots(figsize=(8, 6))
+            cax = ax.matshow(matrix_data, cmap='RdBu', vmin=-1, vmax=1)
+            fig.colorbar(cax)
+            
+            ax.set_xticks(np.arange(len(cols)))
+            ax.set_yticks(np.arange(len(cols)))
+            ax.set_xticklabels(cols, rotation=45, ha='left')
+            ax.set_yticklabels(cols)
+            
+            # Add labels
+            for (i, j), z in np.ndenumerate(matrix_data):
+                ax.text(j, i, f'{z:.2f}', ha='center', va='center',
+                        bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.8', alpha=0.8))
+                
+            plt.title("Correlation Matrix", pad=20, fontsize=12, fontweight='bold')
+            plt.tight_layout()
+            heatmap_path = os.path.join(output_dir, "correlation_heatmap.png")
+            plt.savefig(heatmap_path, dpi=200, bbox_inches='tight')
+            plt.close()
+            paths['correlation_heatmap'] = heatmap_path
+
+    # 4. Numerical Distributions
     if numeric_cols:
         fig, axes = plt.subplots(1, min(3, len(numeric_cols)), figsize=(15, 4), squeeze=False)
         for idx, col in enumerate(numeric_cols[:3]):
