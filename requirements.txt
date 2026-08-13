@@ -1,0 +1,10 @@
+pandas
+numpy
+scipy
+plotly
+openpyxl
+fpdf2
+matplotlib
+Flask
+python-dotenv
+requests

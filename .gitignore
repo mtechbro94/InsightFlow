@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+env/
+
+# Uploaded and downloaded data
+uploads/*
+downloads/*
+static/charts/*
+test_outputs/
+
+# OS-generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Log files
+*.log

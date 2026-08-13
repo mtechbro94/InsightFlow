@@ -1,0 +1,67 @@
+/* Premium styling tokens */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+body {
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #020617; /* slate-950 */
+}
+::-webkit-scrollbar-thumb {
+    background: #1e293b; /* slate-800 */
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #4f46e5; /* indigo-600 */
+}
+
+/* Custom Modal Backdrop Blur */
+#modal-spinner {
+    background-color: rgba(2, 6, 23, 0.7);
+    backdrop-filter: blur(8px);
+}
+
+/* Premium Card hover effects */
+.bg-slate-900 {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bg-slate-900:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.15);
+}
+
+/* Column cards inside steps */
+.column-card {
+    background-color: #020617; /* slate-950 */
+    border: 1px solid #1e293b;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    transition: all 0.2s ease-in-out;
+}
+.column-card:hover {
+    border-color: #6366f1;
+}
+
+/* Glowing Animations */
+.glow-indigo {
+    box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.3);
+}
+
+/* Custom Table Row Transitions */
+#tbody-rows tr {
+    transition: background-color 0.15s ease-in-out;
+}
+
+/* Custom selection fields */
+select, input[type="text"] {
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+select:focus, input[type="text"]:focus {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}

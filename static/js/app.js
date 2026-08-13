@@ -1,0 +1,450 @@
+// UI elements and globally scoped variables for managing active states
+let datasetMetadata = null;
+let currentCleanLogs = [];
+let datasetProfile = null;
+let activeDashboardData = null;
+
+// Dashboard Tab management
+let activeInsightTab = 'business';
+let activePlotlyCharts = {};
+let tableQuery = '';
+let tablePage = 0;
+const pageSize = 10;
+
+// Global helper: Show/hide spinner modal
+function showSpinner(text = "Processing...") {
+    document.getElementById('spinner-text').textContent = text;
+    document.getElementById('modal-spinner').classList.remove('hidden');
+}
+
+function hideSpinner() {
+    document.getElementById('modal-spinner').classList.add('hidden');
+}
+
+// 1. Ingestion / Upload Phase
+async function handleFileUpload(file) {
+    if (!file) return;
+
+    const uploader = document.getElementById('step-upload');
+    const loading = document.getElementById('upload-loading');
+    
+    // Toggle loading UI
+    loading.classList.remove('hidden');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            alert("Upload failed: " + (result.error || "Unknown error"));
+            loading.classList.add('hidden');
+            return;
+        }
+
+        // Store state
+        datasetMetadata = result;
+        
+        // Setup Step 2 UI
+        document.getElementById('clean-filename').textContent = result.filename;
+        document.getElementById('profile-rows').textContent = result.num_records.toLocaleString();
+        document.getElementById('profile-cols').textContent = result.num_features;
+        document.getElementById('profile-dups').textContent = result.duplicate_count.toLocaleString();
+        
+        // Build Inferred columns cards
+        buildColumnsProfileGrid(result.columns);
+        
+        // Transition Sections
+        uploader.classList.add('hidden');
+        document.getElementById('step-cleaning').classList.remove('hidden');
+        
+    } catch (e) {
+        alert("Server communication error: " + e.message);
+        loading.classList.add('hidden');
+    }
+}
+
+// Render column profiles inside cards
+function buildColumnsProfileGrid(columns) {
+    const grid = document.getElementById('columns-profile-grid');
+    grid.innerHTML = '';
+
+    for (const [colName, details] of Object.entries(columns)) {
+        const card = document.createElement('div');
+        card.className = 'column-card flex flex-col justify-between';
+        
+        // Color typing based on inferred label
+        let typeBadgeColor = 'bg-slate-800 text-slate-400';
+        if (details.inferred_type === 'numeric') typeBadgeColor = 'bg-indigo-600/20 text-indigo-400';
+        else if (details.inferred_type === 'categorical') typeBadgeColor = 'bg-emerald-600/20 text-emerald-400';
+        else if (details.inferred_type === 'datetime') typeBadgeColor = 'bg-pink-600/20 text-pink-400';
+        else if (details.inferred_type === 'boolean') typeBadgeColor = 'bg-amber-600/20 text-amber-400';
+        else if (details.inferred_type === 'id') typeBadgeColor = 'bg-purple-600/20 text-purple-400';
+
+        // Sample values list
+        const sampleText = details.sample_values.slice(0, 3).join(', ');
+
+        card.innerHTML = `
+            <div>
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm font-bold truncate text-white max-w-[150px]" title="${colName}">${colName}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider ${typeBadgeColor}">${details.inferred_type}</span>
+                </div>
+                <div class="text-[11px] text-slate-400 space-y-1 mt-3">
+                    <div class="flex justify-between"><span>Nulls:</span> <span class="${details.null_count > 0 ? 'text-red-400 font-semibold' : 'text-slate-300'}">${details.null_count} (${details.null_pct.toFixed(1)}%)</span></div>
+                    <div class="flex justify-between"><span>Uniques:</span> <span class="text-slate-300">${details.unique_count}</span></div>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-900/50 text-[10px] text-slate-500 italic truncate">
+                Samples: ${sampleText || 'None'}
+            </div>
+        `;
+        grid.appendChild(card);
+    }
+}
+
+// 2. Cleaning Phase
+async function executeCleaningPipeline() {
+    const imputation = document.getElementById('setting-imputation').value;
+    const dropDuplicates = document.getElementById('setting-duplicates').checked;
+
+    showSpinner("Running Data Cleaning Pipeline...");
+
+    try {
+        const response = await fetch('/api/clean', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imputation_strategy: imputation,
+                drop_duplicates: dropDuplicates
+            })
+        });
+
+        const result = await response.json();
+        hideSpinner();
+
+        if (!response.ok) {
+            alert("Cleaning failed: " + (result.error || "Unknown error"));
+            return;
+        }
+
+        // Store result logs
+        currentCleanLogs = result.cleaning_log;
+        
+        // Setup Terminal Log UI
+        const term = document.getElementById('clean-terminal-output');
+        term.innerHTML = '';
+        
+        // Transition step sections
+        document.getElementById('step-cleaning').classList.add('hidden');
+        document.getElementById('step-logs').classList.remove('hidden');
+
+        // Play console logging effect
+        let logIdx = 0;
+        function printNextLog() {
+            if (logIdx < currentCleanLogs.length) {
+                const line = document.createElement('div');
+                line.className = 'mt-1.5 opacity-90 transition-opacity duration-300';
+                line.innerHTML = `<span class="text-indigo-400">⚡</span> ${currentCleanLogs[logIdx]}`;
+                term.appendChild(line);
+                term.scrollTop = term.scrollHeight; // Auto scroll to bottom
+                logIdx++;
+                setTimeout(printNextLog, 250); // Delay for visual typewriter feel
+            } else {
+                const finishLine = document.createElement('div');
+                finishLine.className = 'mt-3 text-emerald-400 font-bold';
+                finishLine.textContent = "> Clean dataset and metadata successfully cached on server. Data is ready for EDA.";
+                term.appendChild(finishLine);
+                term.scrollTop = term.scrollHeight;
+            }
+        }
+        
+        printNextLog();
+
+    } catch (e) {
+        hideSpinner();
+        alert("Cleaning pipeline crashed: " + e.message);
+    }
+}
+
+// 3. Analysis / Insight Generation Phase
+async function runStatisticalAnalysis() {
+    showSpinner("Executing Statistical EDA & Insight Engine...");
+
+    try {
+        const response = await fetch('/api/analyze', {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        hideSpinner();
+
+        if (!response.ok) {
+            alert("Analysis failed: " + (result.error || "Unknown error"));
+            return;
+        }
+
+        // Cache dashboard dataset state
+        activeDashboardData = result;
+        activePlotlyCharts = result.plotly_charts;
+        
+        // Hide Logs step and display dynamic dashboard
+        document.getElementById('step-logs').classList.add('hidden');
+        document.getElementById('step-dashboard').classList.remove('hidden');
+
+        // Render sections
+        renderDashboardKPIs();
+        renderDashboardInsights();
+        renderOutliersWarning();
+        renderDashboardCharts();
+        
+        // Build interactive Table Explorer
+        tablePage = 0;
+        tableQuery = '';
+        document.getElementById('table-search').value = '';
+        renderTableExplorer();
+
+    } catch (e) {
+        hideSpinner();
+        alert("Exploratory Analysis crashed: " + e.message);
+    }
+}
+
+// 4. Render Dashboard Widgets
+function renderDashboardKPIs() {
+    const container = document.getElementById('dash-kpi-grid');
+    container.innerHTML = '';
+
+    const kpis = activeDashboardData.kpis || [];
+    kpis.forEach(kpi => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-6 shadow-lg flex flex-col justify-between transition-all duration-300 hover:-translate-y-1';
+        card.innerHTML = `
+            <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase mb-2">${kpi.name}</span>
+            <span class="text-3xl font-extrabold text-white tracking-tight">${kpi.value}</span>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function renderDashboardInsights() {
+    const list = document.getElementById('dash-insights-list');
+    list.innerHTML = '';
+
+    const catInsights = activeDashboardData.insights[activeInsightTab] || [];
+    if (catInsights.length === 0) {
+        list.innerHTML = `<li class="text-slate-400 text-sm italic">No insights computed for this category.</li>`;
+        return;
+    }
+
+    catInsights.forEach(ins => {
+        const li = document.createElement('li');
+        li.className = 'flex items-start text-sm text-slate-300 space-x-2.5 bg-slate-950 p-3.5 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-colors';
+        li.innerHTML = `
+            <span class="text-indigo-500 mt-1 select-none font-bold">▪</span>
+            <span>${ins}</span>
+        `;
+        list.appendChild(li);
+    });
+}
+
+function switchDashInsight(tabId) {
+    // Style adjustments
+    document.getElementById(`dash-tab-${activeInsightTab}`).className = "px-3 py-1 text-xs rounded-md bg-slate-800 text-slate-400 hover:text-slate-200";
+    activeInsightTab = tabId;
+    document.getElementById(`dash-tab-${tabId}`).className = "px-3 py-1 text-xs rounded-md bg-indigo-600 text-white font-medium";
+
+    renderDashboardInsights();
+}
+
+function renderOutliersWarning() {
+    const container = document.getElementById('dash-outliers-container');
+    container.innerHTML = '';
+    
+    // We get outlier definitions from activeDashboardData or the initial log
+    // Wait, let's load outlier metadata
+    // We need to fetch outlier summary from the server or load from the activeDashboardData
+    // We cached outliers inside the session_state and return them on Clean call.
+    // If not visible, look in the logs
+    const outliers = activeDashboardData.eda_results.numerical; // descriptive stats
+    let outliersFound = false;
+
+    // We can evaluate outliers using skewness or direct values
+    for (const [colName, stats] of Object.entries(outliers)) {
+        if (Math.abs(stats.skewness) > 1.5) {
+            outliersFound = true;
+            const card = document.createElement('div');
+            card.className = 'p-4 bg-amber-600/5 border border-amber-500/20 rounded-xl flex items-start space-x-3 text-xs text-slate-300';
+            
+            card.innerHTML = `
+                <div class="text-amber-500 mt-0.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <div>
+                    <span class="font-bold text-amber-400 block">${colName} - Distribution Alert</span>
+                    <span class="block mt-1">Highly skewed distribution (skewness: ${stats.skewness.toFixed(2)}). Data range: [${stats.min.toLocaleString()} to ${stats.max.toLocaleString()}]. Standard deviation is high (${stats.std.toFixed(2)}).</span>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+    }
+
+    if (!outliersFound) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-center h-full text-slate-500 text-xs py-8">
+                <svg class="w-8 h-8 text-emerald-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>No severe outlier anomalies or skewness warnings flagged in numeric distributions.</span>
+            </div>
+        `;
+    }
+}
+
+// 5. Render Plotly Charts
+function renderDashboardCharts() {
+    const targets = ['dash-chart-1', 'dash-chart-2', 'dash-chart-3', 'dash-chart-4'];
+    
+    // Extract available chart keys
+    let chartKeys = [];
+    
+    // Correlation Matrix Heatmap first
+    if (activePlotlyCharts.correlation_heatmap) chartKeys.push('correlation_heatmap');
+    if (activePlotlyCharts.scatter_relation) chartKeys.push('scatter_relation');
+    
+    // Add sub-chart categories
+    if (activePlotlyCharts.distributions) {
+        Object.keys(activePlotlyCharts.distributions).forEach(k => chartKeys.push(`distributions__${k}`));
+    }
+    if (activePlotlyCharts.categorical) {
+        Object.keys(activePlotlyCharts.categorical).forEach(k => chartKeys.push(`categorical__${k}`));
+    }
+    if (activePlotlyCharts.time_series) {
+        Object.keys(activePlotlyCharts.time_series).forEach(k => chartKeys.push(`time_series__${k}`));
+    }
+
+    targets.forEach((targetId, idx) => {
+        const container = document.getElementById(targetId);
+        container.innerHTML = '';
+
+        if (idx < chartKeys.length) {
+            const key = chartKeys[idx];
+            let chartConfig = null;
+
+            if (key === 'correlation_heatmap') {
+                chartConfig = activePlotlyCharts.correlation_heatmap;
+            } else if (key === 'scatter_relation') {
+                chartConfig = activePlotlyCharts.scatter_relation;
+            } else if (key.startsWith('distributions__')) {
+                const colName = key.split('__')[1];
+                chartConfig = activePlotlyCharts.distributions[colName];
+            } else if (key.startsWith('categorical__')) {
+                const colName = key.split('__')[1];
+                chartConfig = activePlotlyCharts.categorical[colName];
+            } else if (key.startsWith('time_series__')) {
+                const colName = key.split('__')[1];
+                chartConfig = activePlotlyCharts.time_series[colName];
+            }
+
+            if (chartConfig) {
+                Plotly.newPlot(targetId, chartConfig.data, chartConfig.layout, { responsive: true });
+            }
+        } else {
+            container.innerHTML = `
+                <div class="flex items-center justify-center h-full text-slate-500 text-xs">
+                    <span>No matching statistical relationship to plot in this panel.</span>
+                </div>
+            `;
+        }
+    });
+}
+
+// 6. Detailed Data Explorer Table
+async function renderTableExplorer() {
+    const thead = document.getElementById('thead-row');
+    const tbody = document.getElementById('tbody-rows');
+    
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    // We can query server metadata to render table column names
+    const metadata = activeDashboardData || datasetMetadata;
+    if (!metadata) return;
+
+    const columns = Object.keys(metadata.eda_results?.numerical || metadata.columns);
+    
+    // Draw columns headers
+    columns.forEach(col => {
+        const th = document.createElement('th');
+        th.className = 'px-6 py-3 font-semibold text-slate-200';
+        th.textContent = col;
+        thead.appendChild(th);
+    });
+
+    // We need to fetch table rows. To avoid heavy DOM, we load samples or request paginated slice.
+    // Since it's a SPA for files, we can request a preview api or write a client side preview.
+    // To make it simple, let's write a small API endpoint or load a subset of the DataFrame in the JSON.
+    // Wait! Let's write a paginated preview endpoint or pull standard preview rows in the API upload/clean steps.
+    // Actually, in app.py we did not expose the raw records in /api/analyze to keep JSON response fast, but we can easily fetch them!
+    // Or we can query a `/api/preview?page=0&query=foo` endpoint!
+    // Let's implement an endpoint `/api/preview` or fetch preview data in JS.
+    // Wait, let's create a quick API preview endpoint to load rows dynamically! This is extremely elegant.
+    // Let's implement it! Let's write it in static/js/app.js first assuming `/api/preview` works.
+    
+    try {
+        const res = await fetch(`/api/preview?page=${tablePage}&size=${pageSize}&query=${encodeURIComponent(tableQuery)}`);
+        const result = await res.json();
+        
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-6 py-4 text-center text-slate-500">Failed to load preview data.</td></tr>`;
+            return;
+        }
+
+        document.getElementById('total-rows').textContent = result.total.toLocaleString();
+        
+        const start = tablePage * pageSize + 1;
+        const end = Math.min(start + pageSize - 1, result.total);
+        document.getElementById('showing-range').textContent = `${result.total > 0 ? start : 0}-${end}`;
+        
+        document.getElementById('btn-prev').disabled = tablePage === 0;
+        document.getElementById('btn-next').disabled = end >= result.total;
+
+        if (result.rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-6 py-8 text-center text-slate-500">No records match search query.</td></tr>`;
+            return;
+        }
+
+        result.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-800/30 transition-colors border-b border-slate-900';
+            
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                td.className = 'px-6 py-4 whitespace-nowrap text-slate-300 font-medium';
+                let val = row[col];
+                if (val === null || val === undefined) val = '-';
+                td.textContent = String(val);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="${columns.length}" class="px-6 py-4 text-center text-slate-500">Preview loading exception: ${e.message}</td></tr>`;
+    }
+}
+
+function handleTableSearch(val) {
+    tableQuery = val;
+    tablePage = 0;
+    renderTableExplorer();
+}
+
+function changePage(direction) {
+    tablePage += direction;
+    renderTableExplorer();
+}
