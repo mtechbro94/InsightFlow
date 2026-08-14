@@ -43,6 +43,18 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS alert_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            metric TEXT NOT NULL,
+            column_name TEXT NOT NULL,
+            operator TEXT NOT NULL,
+            value REAL NOT NULL,
+            severity TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -80,7 +92,8 @@ session_state = {
     'kpis': [],
     'insights': {},
     'eda_results': {},
-    'active_model': None
+    'active_model': None,
+    'alert_rules': []
 }
 @app.route('/api/auth/register', methods=['POST'])
 def api_register():
@@ -967,6 +980,194 @@ def api_predictive_simulate():
         })
     except Exception as e:
         return jsonify({'error': f"Simulation failed: {str(e)}"}), 500
+
+@app.route('/api/alerts/rules', methods=['GET', 'POST'])
+def api_alerts_rules():
+    """Gets or sets automated alert threshold rules."""
+    user_id = session.get('user_id')
+    if request.method == 'GET':
+        if user_id:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute('SELECT id, metric, column_name, operator, value, severity FROM alert_rules WHERE user_id = ?', (user_id,))
+                rows = c.fetchall()
+                conn.close()
+                rules = [{
+                    'id': r[0],
+                    'metric': r[1],
+                    'column_name': r[2],
+                    'operator': r[3],
+                    'value': r[4],
+                    'severity': r[5]
+                } for r in rows]
+                return jsonify({'rules': rules})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        else:
+            return jsonify({'rules': session_state.get('alert_rules', [])})
+            
+    else: # POST
+        data = request.json or {}
+        metric = data.get('metric', 'mean')
+        column_name = data.get('column_name')
+        operator = data.get('operator')
+        try:
+            value = float(data.get('value', 0))
+        except ValueError:
+            return jsonify({'error': 'Alert threshold value must be a number.'}), 400
+        severity = data.get('severity', 'warning')
+        
+        if not column_name or not operator:
+            return jsonify({'error': 'Column name and comparison operator are required.'}), 400
+            
+        if user_id:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute('''
+                    INSERT INTO alert_rules (user_id, metric, column_name, operator, value, severity)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (user_id, metric, column_name, operator, value, severity))
+                conn.commit()
+                conn.close()
+                return jsonify({'message': 'Alert threshold rule created successfully.'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        else:
+            new_id = len(session_state.get('alert_rules', [])) + 1
+            new_rule = {
+                'id': new_id,
+                'metric': metric,
+                'column_name': column_name,
+                'operator': operator,
+                'value': value,
+                'severity': severity
+            }
+            if 'alert_rules' not in session_state:
+                session_state['alert_rules'] = []
+            session_state['alert_rules'].append(new_rule)
+            return jsonify({'message': 'Alert threshold rule added to session cache.'})
+
+@app.route('/api/alerts/rules/<int:rule_id>', methods=['DELETE'])
+def api_delete_alert_rule(rule_id):
+    """Deletes an alert rule by ID."""
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('DELETE FROM alert_rules WHERE id = ? AND user_id = ?', (rule_id, user_id))
+            conn.commit()
+            conn.close()
+            return jsonify({'message': 'Rule deleted successfully.'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    else:
+        if 'alert_rules' in session_state:
+            session_state['alert_rules'] = [r for r in session_state['alert_rules'] if r['id'] != rule_id]
+        return jsonify({'message': 'Rule removed from session cache.'})
+
+@app.route('/api/alerts/evaluate', methods=['GET'])
+def api_evaluate_alerts():
+    """Evaluates the loaded dataset against active alert rules."""
+    active_csv_path = session_state['cleaned_csv_path'] or session_state['converted_csv_path']
+    if not active_csv_path or not os.path.exists(active_csv_path):
+        return jsonify({'alerts': []})
+        
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('SELECT id, metric, column_name, operator, value, severity FROM alert_rules WHERE user_id = ?', (user_id,))
+            rows = c.fetchall()
+            conn.close()
+            rules = [{
+                'id': r[0],
+                'metric': r[1],
+                'column_name': r[2],
+                'operator': r[3],
+                'value': r[4],
+                'severity': r[5]
+            } for r in rows]
+        except Exception:
+            rules = []
+    else:
+        rules = session_state.get('alert_rules', [])
+        
+    if not rules:
+        return jsonify({'alerts': []})
+        
+    try:
+        df = pd.read_csv(active_csv_path)
+        triggered = []
+        
+        for rule in rules:
+            col = rule['column_name']
+            if col not in df.columns:
+                continue
+                
+            metric = rule['metric']
+            op = rule['operator']
+            limit = rule['value']
+            sev = rule['severity']
+            
+            actual = None
+            if metric == 'mean':
+                actual = float(df[col].mean())
+            elif metric == 'sum':
+                actual = float(df[col].sum())
+            elif metric == 'min':
+                actual = float(df[col].min())
+            elif metric == 'max':
+                actual = float(df[col].max())
+            elif metric == 'null_count':
+                actual = int(df[col].isnull().sum())
+            elif metric == 'outliers':
+                col_series = df[col].dropna()
+                if pd.api.types.is_numeric_dtype(col_series) and len(col_series) > 0:
+                    q1 = col_series.quantile(0.25)
+                    q3 = col_series.quantile(0.75)
+                    iqr = q3 - q1
+                    lower_bound = q1 - 1.5 * iqr
+                    upper_bound = q3 + 1.5 * iqr
+                    outliers_series = col_series[(col_series < lower_bound) | (col_series > upper_bound)]
+                    actual = len(outliers_series)
+                else:
+                    actual = 0
+            
+            if actual is None:
+                continue
+                
+            triggered_flag = False
+            if op == '<':
+                triggered_flag = (actual < limit)
+            elif op == '>':
+                triggered_flag = (actual > limit)
+            elif op == '=':
+                triggered_flag = (abs(actual - limit) < 1e-5)
+                
+            if triggered_flag:
+                metric_label = metric.replace('_', ' ').capitalize()
+                actual_fmt = f"{actual:,.2f}" if isinstance(actual, float) else str(actual)
+                limit_fmt = f"{limit:,.2f}" if isinstance(limit, float) else str(limit)
+                
+                msg = f"{sev.upper()}: {metric_label} of '{col}' is {actual_fmt}, breaching threshold of {op} {limit_fmt}"
+                triggered.append({
+                    'id': rule['id'],
+                    'message': msg,
+                    'severity': sev,
+                    'column': col,
+                    'metric': metric,
+                    'actual': actual,
+                    'limit': limit,
+                    'operator': op
+                })
+                
+        return jsonify({'alerts': triggered})
+    except Exception as e:
+        return jsonify({'error': f"Failed to evaluate thresholds: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Start on standard port 5000

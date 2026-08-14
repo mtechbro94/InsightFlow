@@ -243,6 +243,10 @@ async function runStatisticalAnalysis() {
         renderOutliersWarning();
         renderDashboardCharts();
         
+        // Show notifications bell and trigger evaluation
+        document.getElementById('navbar-alerts-bell-container').classList.remove('hidden');
+        evaluateThresholdAlerts();
+        
         // Build interactive Table Explorer
         tablePage = 0;
         tableQuery = '';
@@ -1065,6 +1069,9 @@ async function loadHistoryItem(historyId) {
         renderOutliersWarning();
         renderDashboardCharts();
         
+        document.getElementById('navbar-alerts-bell-container').classList.remove('hidden');
+        evaluateThresholdAlerts();
+        
         tablePage = 0;
         tableQuery = '';
         document.getElementById('table-search').value = '';
@@ -1080,17 +1087,21 @@ function switchExplorerTab(tab) {
     const btnRecords = document.getElementById('tab-btn-records');
     const btnPivot = document.getElementById('tab-btn-pivot');
     const btnPredictive = document.getElementById('tab-btn-predictive');
+    const btnAlerts = document.getElementById('tab-btn-alerts');
     const viewRecords = document.getElementById('explorer-records-view');
     const viewPivot = document.getElementById('explorer-pivot-view');
     const viewPredictive = document.getElementById('explorer-predictive-view');
+    const viewAlerts = document.getElementById('explorer-alerts-view');
     
     btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all";
     btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
     btnPredictive.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
+    btnAlerts.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
     
     viewRecords.classList.add('hidden');
     viewPivot.classList.add('hidden');
     viewPredictive.classList.add('hidden');
+    viewAlerts.classList.add('hidden');
     
     if (tab === 'records') {
         btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all";
@@ -1103,6 +1114,11 @@ function switchExplorerTab(tab) {
         btnPredictive.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all ml-1";
         viewPredictive.classList.remove('hidden');
         populatePredictiveDropdowns();
+    } else if (tab === 'alerts') {
+        btnAlerts.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all ml-1";
+        viewAlerts.classList.remove('hidden');
+        populateAlertDropdowns();
+        loadAlertRules();
     }
 }
 
@@ -1674,6 +1690,188 @@ async function checkAuthStatus() {
         }
     } catch (e) {
         console.warn("Auth status lookup failed: " + e.message);
+    }
+}
+
+// 15. Automated KPI Alerts & Threshold Notifications (Option K)
+function populateAlertDropdowns() {
+    const colSelect = document.getElementById('alert-col-select');
+    if (!colSelect || !activeDashboardData || !activeDashboardData.datasetMetadata) return;
+    
+    colSelect.innerHTML = '';
+    const cols = activeDashboardData.datasetMetadata.columns || [];
+    cols.forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col.name;
+        opt.textContent = `${col.name} (${col.type})`;
+        colSelect.appendChild(opt);
+    });
+}
+
+async function loadAlertRules() {
+    const tbody = document.getElementById('alert-rules-tbody');
+    if (!tbody) return;
+    
+    try {
+        const response = await fetch('/api/alerts/rules');
+        const result = await response.json();
+        
+        if (!response.ok) {
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Failed to load rules.</td></tr>`;
+            return;
+        }
+        
+        const rules = result.rules || [];
+        if (rules.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No active alert rules configured yet.</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        rules.forEach(rule => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-900/50 transition-colors";
+            
+            const metricLabel = rule.metric.replace('_', ' ').toUpperCase();
+            const sevBadge = rule.severity === 'critical' 
+                ? `<span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 font-mono text-[10px]">Critical</span>` 
+                : `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono text-[10px]">Warning</span>`;
+                
+            tr.innerHTML = `
+                <td class="px-4 py-3.5 font-semibold text-slate-200 font-mono">${rule.column_name}</td>
+                <td class="px-4 py-3.5 text-slate-400">${metricLabel}</td>
+                <td class="px-4 py-3.5 text-slate-300 font-mono">${rule.operator} ${rule.value.toLocaleString()}</td>
+                <td class="px-4 py-3.5">${sevBadge}</td>
+                <td class="px-4 py-3.5 text-right">
+                    <button onclick="deleteAlertRule(${rule.id})" class="p-1 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Error: ${e.message}</td></tr>`;
+    }
+}
+
+async function addAlertRule() {
+    const col = document.getElementById('alert-col-select').value;
+    const metric = document.getElementById('alert-metric-select').value;
+    const op = document.getElementById('alert-op-select').value;
+    const valInput = document.getElementById('alert-val-input');
+    const severity = document.getElementById('alert-sev-select').value;
+    
+    const value = parseFloat(valInput.value);
+    if (isNaN(value)) {
+        alert("Please enter a valid numeric threshold limit.");
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/alerts/rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                column_name: col,
+                metric: metric,
+                operator: op,
+                value: value,
+                severity: severity
+            })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            alert("Failed to add threshold rule: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        valInput.value = '';
+        await loadAlertRules();
+        await evaluateThresholdAlerts();
+    } catch (e) {
+        alert("Communications error: " + e.message);
+    }
+}
+
+async function deleteAlertRule(ruleId) {
+    if (!confirm("Are you sure you want to remove this alert threshold rule?")) return;
+    
+    try {
+        const response = await fetch(`/api/alerts/rules/${ruleId}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            alert("Failed to delete rule: " + (result.error || "Unknown error"));
+            return;
+        }
+        await loadAlertRules();
+        await evaluateThresholdAlerts();
+    } catch (e) {
+        alert("Communications error: " + e.message);
+    }
+}
+
+let alertsDropdownOpen = false;
+function toggleAlertsDropdown() {
+    alertsDropdownOpen = !alertsDropdownOpen;
+    const drop = document.getElementById('alerts-dropdown');
+    if (alertsDropdownOpen) {
+        drop.classList.remove('hidden');
+    } else {
+        drop.classList.add('hidden');
+    }
+}
+
+async function evaluateThresholdAlerts() {
+    const listContainer = document.getElementById('alerts-list-container');
+    const badge = document.getElementById('alerts-badge');
+    const countEl = document.getElementById('alerts-count');
+    
+    if (!listContainer) return;
+    
+    try {
+        const response = await fetch('/api/alerts/evaluate');
+        const result = await response.json();
+        
+        if (!response.ok) {
+            listContainer.innerHTML = `<div class="text-rose-500 text-center py-2">Evaluation failed.</div>`;
+            badge.classList.add('hidden');
+            countEl.textContent = '0 alerts';
+            return;
+        }
+        
+        const alerts = result.alerts || [];
+        countEl.textContent = `${alerts.length} alert${alerts.length === 1 ? '' : 's'}`;
+        
+        if (alerts.length === 0) {
+            listContainer.innerHTML = `<div class="text-slate-500 text-center py-4">No active breaches. All metrics stable.</div>`;
+            badge.classList.add('hidden');
+            return;
+        }
+        
+        badge.classList.remove('hidden');
+        
+        listContainer.innerHTML = '';
+        alerts.forEach(alert => {
+            const div = document.createElement('div');
+            const colorClass = alert.severity === 'critical' ? 'border-rose-500/20 bg-rose-500/5' : 'border-amber-500/20 bg-amber-500/5';
+            const iconColor = alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400';
+            
+            div.className = `p-3 rounded-xl border ${colorClass} flex items-start space-x-2.5`;
+            div.innerHTML = `
+                <svg class="w-4 h-4 ${iconColor} shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <div class="leading-relaxed text-[10px]">
+                    <span class="font-bold text-slate-200 capitalize block">${alert.severity} Breach</span>
+                    <span class="text-slate-400 mt-0.5 block leading-normal">${alert.message}</span>
+                </div>
+            `;
+            listContainer.appendChild(div);
+        });
+    } catch (e) {
+        listContainer.innerHTML = `<div class="text-rose-500 text-center py-2">Error: ${e.message}</div>`;
     }
 }
 

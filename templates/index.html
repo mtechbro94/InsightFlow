@@ -86,6 +86,24 @@
                     <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
                     InsightFlow Proprietary Neural Core (16-bit Quantized)
                 </span>
+                <!-- Notification center bell (Option K) -->
+                <div class="relative hidden" id="navbar-alerts-bell-container">
+                    <button onclick="toggleAlertsDropdown()" class="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded-xl transition-all relative">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        <span id="alerts-badge" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse hidden"></span>
+                    </button>
+                    <!-- Notification Dropdown list -->
+                    <div id="alerts-dropdown" class="hidden absolute right-0 mt-3 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 z-50 space-y-3 text-xs max-h-72 overflow-y-auto">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="font-bold text-white">Active Threshold Alerts</span>
+                            <span class="text-[10px] text-indigo-400 font-mono" id="alerts-count">0 alerts</span>
+                        </div>
+                        <div id="alerts-list-container" class="space-y-2">
+                            <div class="text-slate-500 text-center py-4">No active breaches.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Authentication Status -->
                 <div id="navbar-auth" class="flex items-center space-x-3 text-xs">
                     <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all">Sign In</button>
@@ -524,6 +542,7 @@
                         <button onclick="switchExplorerTab('records')" id="tab-btn-records" class="px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all">Raw Records</button>
                         <button onclick="switchExplorerTab('pivot')" id="tab-btn-pivot" class="px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1">No-Code Pivot Builder</button>
                         <button onclick="switchExplorerTab('predictive')" id="tab-btn-predictive" class="px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1">Predictive ML Sandbox</button>
+                        <button onclick="switchExplorerTab('alerts')" id="tab-btn-alerts" class="px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1">Automated Alerts</button>
                     </div>
                 </div>
 
@@ -703,6 +722,88 @@
                                 <p class="text-[10px] text-slate-500 leading-normal px-4">
                                     Simulations are run in real-time on your trained Random Forest regressor using current slider coordinates.
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View 4: Automated KPI Threshold Alerts (Option K) -->
+                <div id="explorer-alerts-view" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Left: Rules config form -->
+                        <div class="space-y-4 bg-slate-950/30 p-5 rounded-2xl border border-slate-850">
+                            <h3 class="text-sm font-bold text-slate-200">Configure Rule Threshold</h3>
+                            
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Select Column</label>
+                                <select id="alert-col-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                    <!-- Numerical and categoricals populated dynamically -->
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Aggregation Metric</label>
+                                <select id="alert-metric-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                    <option value="mean" selected>Mean Average</option>
+                                    <option value="sum">Sum Total</option>
+                                    <option value="min">Minimum Value</option>
+                                    <option value="max">Maximum Value</option>
+                                    <option value="null_count">Null cell Count</option>
+                                    <option value="outliers">Outliers count (IQR)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Condition</label>
+                                    <select id="alert-op-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                        <option value="<" selected>Less than (&lt;)</option>
+                                        <option value=">">Greater than (&gt;)</option>
+                                        <option value="=">Equals (=)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Threshold</label>
+                                    <input type="number" id="alert-val-input" placeholder="0" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Severity</label>
+                                <select id="alert-sev-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                    <option value="warning" selected>Warning Alert (Yellow)</option>
+                                    <option value="critical">Critical Breach (Red)</option>
+                                </select>
+                            </div>
+                            
+                            <button onclick="addAlertRule()" class="w-full py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center space-x-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>Create Threshold Rule</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Right: Active Rules List and Logs -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-850 space-y-4">
+                                <h3 class="text-sm font-bold text-slate-200">Active Alert Configuration Rules</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-xs text-left text-slate-300">
+                                        <thead class="text-[10px] text-slate-500 uppercase bg-slate-900 border-b border-slate-850">
+                                            <tr>
+                                                <th class="px-4 py-2 font-semibold">Column</th>
+                                                <th class="px-4 py-2 font-semibold">Metric</th>
+                                                <th class="px-4 py-2 font-semibold">Breach Rule</th>
+                                                <th class="px-4 py-2 font-semibold">Severity</th>
+                                                <th class="px-4 py-2 text-right font-semibold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="alert-rules-tbody" class="divide-y divide-slate-850">
+                                            <tr>
+                                                <td colspan="5" class="px-4 py-6 text-center text-slate-500">No active alert rules configured yet.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
