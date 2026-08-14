@@ -1079,21 +1079,30 @@ async function loadHistoryItem(historyId) {
 function switchExplorerTab(tab) {
     const btnRecords = document.getElementById('tab-btn-records');
     const btnPivot = document.getElementById('tab-btn-pivot');
+    const btnPredictive = document.getElementById('tab-btn-predictive');
     const viewRecords = document.getElementById('explorer-records-view');
     const viewPivot = document.getElementById('explorer-pivot-view');
+    const viewPredictive = document.getElementById('explorer-predictive-view');
+    
+    btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all";
+    btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
+    btnPredictive.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
+    
+    viewRecords.classList.add('hidden');
+    viewPivot.classList.add('hidden');
+    viewPredictive.classList.add('hidden');
     
     if (tab === 'records') {
         btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all";
-        btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all ml-1";
         viewRecords.classList.remove('hidden');
-        viewPivot.classList.add('hidden');
-    } else {
-        btnRecords.className = "px-4 py-2 text-xs rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all";
+    } else if (tab === 'pivot') {
         btnPivot.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all ml-1";
-        viewRecords.classList.add('hidden');
         viewPivot.classList.remove('hidden');
-        
         populatePivotDropdowns();
+    } else if (tab === 'predictive') {
+        btnPredictive.className = "px-4 py-2 text-xs rounded-lg font-semibold bg-indigo-600 text-white transition-all ml-1";
+        viewPredictive.classList.remove('hidden');
+        populatePredictiveDropdowns();
     }
 }
 
@@ -1202,6 +1211,229 @@ async function calculatePivotTable() {
         hideSpinner();
         alert("Server communication crashed during pivot: " + e.message);
     }
+}
+
+// 13. Predictive ML Sandbox Builder & Outcome Simulator (Option G)
+function populatePredictiveDropdowns() {
+    const meta = datasetMetadata || (activeDashboardData ? activeDashboardData.datasetMetadata : null);
+    if (!meta || !meta.columns) return;
+    
+    const targetSelect = document.getElementById('predict-target-select');
+    const featuresContainer = document.getElementById('predict-features-container');
+    
+    targetSelect.innerHTML = '';
+    featuresContainer.innerHTML = '';
+    
+    Object.entries(meta.columns).forEach(([colName, colInfo]) => {
+        const type = colInfo.inferred_type;
+        
+        if (type === 'numeric') {
+            const opt = document.createElement('option');
+            opt.value = colName;
+            opt.textContent = colName;
+            targetSelect.appendChild(opt);
+        }
+        
+        const wrapper = document.createElement('label');
+        wrapper.className = "flex items-center space-x-2 text-slate-300 py-1 cursor-pointer hover:text-white transition-colors";
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = "checkbox";
+        checkbox.value = colName;
+        checkbox.className = "predict-feature-check w-4 h-4 text-indigo-600 bg-slate-955 border-slate-800 rounded focus:ring-indigo-500";
+        
+        const allNumeric = Object.entries(meta.columns).filter(([k,v]) => v.inferred_type === 'numeric').map(([k,v]) => k);
+        const defaultTarget = allNumeric[0];
+        if (colName !== defaultTarget && (type === 'numeric' || type === 'categorical')) {
+            checkbox.checked = true;
+        }
+        
+        const labelText = document.createElement('span');
+        labelText.textContent = `${colName} (${type})`;
+        
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(labelText);
+        featuresContainer.appendChild(wrapper);
+    });
+}
+
+async function trainPredictiveModel() {
+    const target = document.getElementById('predict-target-select').value;
+    const checkboxes = document.querySelectorAll('.predict-feature-check:checked');
+    
+    const predictors = [];
+    checkboxes.forEach(cb => {
+        if (cb.value !== target) {
+            predictors.push(cb.value);
+        }
+    });
+    
+    if (!target) {
+        alert("Please select a target column to predict.");
+        return;
+    }
+    
+    if (predictors.length === 0) {
+        alert("Please select at least one predictor feature.");
+        return;
+    }
+    
+    showSpinner("Training Random Forest predictive model...");
+    
+    try {
+        const response = await fetch('/api/predictive/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target, predictors })
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Training failed: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        document.getElementById('ml-metric-r2').textContent = result.metrics.r2.toFixed(4);
+        document.getElementById('ml-metric-mae').textContent = result.metrics.mae.toLocaleString(undefined, { maximumFractionDigits: 4 });
+        document.getElementById('ml-metric-mse').textContent = result.metrics.mse.toLocaleString(undefined, { maximumFractionDigits: 4 });
+        
+        const actuals = result.actual_vs_predicted.map(d => d.actual);
+        const predicted = result.actual_vs_predicted.map(d => d.predicted);
+        
+        const minVal = Math.min(...actuals, ...predicted);
+        const maxVal = Math.max(...actuals, ...predicted);
+        
+        const traceScatter = {
+            x: actuals,
+            y: predicted,
+            mode: 'markers',
+            name: 'Data Point Predictions',
+            type: 'scatter',
+            marker: {
+                color: THEMES[currentTheme].primary,
+                size: 8,
+                opacity: 0.7,
+                line: { color: THEMES[currentTheme].primary, width: 1 }
+            }
+        };
+        
+        const traceLine = {
+            x: [minVal, maxVal],
+            y: [minVal, maxVal],
+            mode: 'lines',
+            name: 'Perfect Projection Line (y=x)',
+            type: 'scatter',
+            line: {
+                color: THEMES[currentTheme].secondary || '#ec4899',
+                width: 2,
+                dash: 'dash'
+            }
+        };
+        
+        const plotLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { l: 50, r: 20, t: 20, b: 50 },
+            font: { color: THEMES[currentTheme].text, family: 'Outfit, sans-serif', size: 10 },
+            xaxis: {
+                title: 'Actual Value',
+                gridcolor: THEMES[currentTheme].grid,
+                linecolor: THEMES[currentTheme].grid
+            },
+            yaxis: {
+                title: 'Predicted Value',
+                gridcolor: THEMES[currentTheme].grid,
+                linecolor: THEMES[currentTheme].grid
+            },
+            showlegend: false
+        };
+        
+        Plotly.newPlot('ml-regression-chart', [traceScatter, traceLine], plotLayout, { responsive: true, displayModeBar: false });
+        
+        const simulatorInputs = document.getElementById('ml-simulator-inputs');
+        simulatorInputs.innerHTML = '';
+        
+        Object.entries(result.predictor_meta).forEach(([featureName, featureMeta]) => {
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = "bg-slate-900/60 p-4 border border-slate-800/80 rounded-xl space-y-2";
+            
+            if (featureMeta.type === 'categorical') {
+                inputWrapper.innerHTML = `
+                    <label class="block text-xs text-slate-400 font-semibold">${featureName}</label>
+                    <select class="ml-simulator-val w-full bg-slate-950 border border-slate-850 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none" data-feature="${featureName}">
+                        ${featureMeta.categories.map(cat => `<option value="${cat}" ${cat === featureMeta.default ? 'selected' : ''}>${cat}</option>`).join('')}
+                    </select>
+                `;
+            } else {
+                const range = featureMeta.max - featureMeta.min;
+                const step = range === 0 ? 0.1 : (range / 100);
+                inputWrapper.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs text-slate-400 font-semibold">${featureName}</label>
+                        <span class="text-xs font-mono font-bold text-indigo-400" id="slider-val-${featureName}">${featureMeta.default.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <input type="range" class="ml-simulator-val w-full h-1.5 bg-slate-955 rounded-lg appearance-none cursor-pointer focus:outline-none accent-indigo-500" 
+                           data-feature="${featureName}"
+                           min="${featureMeta.min}" 
+                           max="${featureMeta.max}" 
+                           step="${step}" 
+                           value="${featureMeta.default}"
+                           oninput="document.getElementById('slider-val-${featureName}').textContent = parseFloat(this.value).toLocaleString(undefined, {maximumFractionDigits: 2})">
+                `;
+            }
+            simulatorInputs.appendChild(inputWrapper);
+        });
+        
+        const simElements = document.querySelectorAll('.ml-simulator-val');
+        simElements.forEach(el => {
+            el.addEventListener('change', runSimulatorInference);
+            el.addEventListener('input', runSimulatorInference);
+        });
+        
+        document.getElementById('ml-simulator-container').classList.remove('hidden');
+        runSimulatorInference();
+    } catch (e) {
+        hideSpinner();
+        alert("Server communication crashed during training: " + e.message);
+    }
+}
+
+let simulatorTimeout = null;
+function runSimulatorInference() {
+    if (simulatorTimeout) clearTimeout(simulatorTimeout);
+    
+    simulatorTimeout = setTimeout(async () => {
+        const inputs = {};
+        const elements = document.querySelectorAll('.ml-simulator-val');
+        elements.forEach(el => {
+            const feature = el.getAttribute('data-feature');
+            inputs[feature] = el.value;
+        });
+        
+        try {
+            const response = await fetch('/api/predictive/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ inputs })
+            });
+            
+            if (!response.ok) return;
+            
+            const result = await response.json();
+            const valEl = document.getElementById('ml-projection-value');
+            
+            const pred = result.prediction;
+            if (typeof pred === 'number') {
+                valEl.textContent = pred.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                valEl.textContent = pred;
+            }
+        } catch (e) {
+            console.warn("Simulator projection failed: " + e.message);
+        }
+    }, 150);
 }
 
 // Window load event bindings

@@ -42,7 +42,8 @@ session_state = {
     'outliers': {},
     'kpis': [],
     'insights': {},
-    'eda_results': {}
+    'eda_results': {},
+    'active_model': None
 }
 
 @app.route('/')
@@ -715,6 +716,69 @@ def api_pivot():
         })
     except Exception as e:
         return jsonify({'error': f"Pivot calculation failed: {str(e)}"}), 500
+
+@app.route('/api/predictive/train', methods=['POST'])
+def api_predictive_train():
+    """Trains predictive model dynamically using user-selected targets and predictors."""
+    active_csv_path = session_state['cleaned_csv_path'] or session_state['converted_csv_path']
+    if not active_csv_path or not os.path.exists(active_csv_path):
+        return jsonify({'error': 'No dataset loaded.'}), 400
+        
+    data = request.json or {}
+    target_col = data.get('target')
+    predictor_cols = data.get('predictors', [])
+    
+    if not target_col or not predictor_cols:
+        return jsonify({'error': 'Please select both target and predictor columns.'}), 400
+        
+    try:
+        df = pd.read_csv(active_csv_path)
+        
+        model_data = analyzer.train_predictive_model(df, target_col, predictor_cols)
+        
+        session_state['active_model'] = {
+            'model': model_data['model'],
+            'encoders': model_data['encoders'],
+            'predictor_meta': model_data['predictor_meta'],
+            'target': target_col,
+            'predictors': predictor_cols
+        }
+        
+        return jsonify({
+            'metrics': model_data['metrics'],
+            'importances': model_data['importances'],
+            'actual_vs_predicted': model_data['actual_vs_predicted'],
+            'predictor_meta': model_data['predictor_meta']
+        })
+        
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': f"Failed to train predictive model: {str(e)}"}), 500
+
+@app.route('/api/predictive/simulate', methods=['POST'])
+def api_predictive_simulate():
+    """Runs a single prediction on the active cached model based on simulated user inputs."""
+    active_model_state = session_state.get('active_model')
+    if not active_model_state:
+        return jsonify({'error': 'No active model found. Please train a predictive model first.'}), 400
+        
+    data = request.json or {}
+    inputs = data.get('inputs', {})
+    
+    try:
+        prediction = analyzer.predict_target(
+            active_model_state['model'],
+            active_model_state['encoders'],
+            active_model_state['predictor_meta'],
+            inputs
+        )
+        return jsonify({
+            'prediction': prediction,
+            'target': active_model_state['target']
+        })
+    except Exception as e:
+        return jsonify({'error': f"Simulation failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Start on standard port 5000
