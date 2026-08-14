@@ -1,7 +1,9 @@
 import os
 import shutil
 import json
-from flask import Flask, request, jsonify, render_template, send_file
+import sqlite3
+import hashlib
+from flask import Flask, request, jsonify, render_template, send_file, session
 from werkzeug.utils import secure_filename
 import pandas as pd
 import plotly.express as px
@@ -13,6 +15,41 @@ import visualization
 import report_generator
 
 app = Flask(__name__)
+app.secret_key = 'insightflow_super_secret_session_key'
+
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'insightflow.db'))
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            record_count INTEGER NOT NULL,
+            meta_json TEXT NOT NULL,
+            converted_csv_path TEXT,
+            cleaned_csv_path TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def hash_password(password):
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 # Configure upload and download folders
 UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
@@ -45,7 +82,74 @@ session_state = {
     'eda_results': {},
     'active_model': None
 }
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    """Registers a new tenant account dynamically inside the SQLite DB."""
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    if len(username) < 3 or len(password) < 4:
+        return jsonify({'error': 'Username must be >= 3 chars, and password >= 4 chars.'}), 400
+        
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        pw_hash = hash_password(password)
+        c.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, pw_hash))
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Account created successfully! You can login now.'})
+    except sqlite3.IntegrityError:
+        return jsonify({'error': 'Username is already taken.'}), 400
+    except Exception as e:
+        return jsonify({'error': f"Registration failed: {str(e)}"}), 500
 
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """Authenticates a user and sets session details."""
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        pw_hash = hash_password(password)
+        c.execute('SELECT id, username FROM users WHERE username = ? AND password_hash = ?', (username, pw_hash))
+        user = c.fetchone()
+        conn.close()
+        
+        if user:
+            session['user_id'] = user[0]
+            session['username'] = user[1]
+            return jsonify({
+                'message': 'Logged in successfully.',
+                'username': user[1]
+            })
+        else:
+            return jsonify({'error': 'Invalid username or password.'}), 401
+    except Exception as e:
+        return jsonify({'error': f"Login failed: {str(e)}"}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    """Logs out the active user session."""
+    session.clear()
+    return jsonify({'message': 'Logged out successfully.'})
+
+@app.route('/api/auth/status', methods=['GET'])
+def api_auth_status():
+    """Returns active user session details if logged in."""
+    if 'user_id' in session:
+        return jsonify({
+            'logged_in': True,
+            'username': session['username']
+        })
+    else:
+        return jsonify({
+            'logged_in': False
+        })
 @app.route('/')
 def index():
     """Serves the main application SPA page."""
@@ -231,14 +335,16 @@ def api_analyze():
             pdf_report_path
         )
 
-        # Option E: Save to history JSON
+        # Option E & J: Save to history JSON and SQLite Database
         import uuid
         from datetime import datetime
         history_id = str(uuid.uuid4())[:8]
+        timestamp_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+        
         history_item = {
             'id': history_id,
             'filename': session_state['filename'],
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'timestamp': timestamp_str,
             'record_count': int(active_profile['num_records']),
             'kpis': kpis,
             'eda': eda_results,
@@ -250,9 +356,34 @@ def api_analyze():
             'converted_csv_path': session_state['converted_csv_path'],
             'cleaned_csv_path': session_state['cleaned_csv_path']
         }
+        
         history_path = os.path.join(app.config['HISTORY_FOLDER'], f"{history_id}.json")
         with open(history_path, 'w') as f:
             json.dump(history_item, f, default=str)
+            
+        user_id = session.get('user_id')
+        if user_id:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                meta_str = json.dumps(history_item, default=str)
+                c.execute('''
+                    INSERT INTO projects (id, user_id, filename, timestamp, record_count, meta_json, converted_csv_path, cleaned_csv_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    history_id,
+                    user_id,
+                    session_state['filename'],
+                    timestamp_str,
+                    int(active_profile['num_records']),
+                    meta_str,
+                    session_state['converted_csv_path'],
+                    session_state['cleaned_csv_path']
+                ))
+                conn.commit()
+                conn.close()
+            except Exception as db_err:
+                print(f"Database save error: {str(db_err)}")
 
         return jsonify({
             'message': 'Analysis complete. Dashboard and PDF generated.',
@@ -631,29 +762,66 @@ def api_export_custom_pdf():
 
 @app.route('/api/history', methods=['GET'])
 def api_get_history():
-    """Lists recent historical audits in history/."""
-    try:
-        items = []
-        for filename in os.listdir(app.config['HISTORY_FOLDER']):
-            if filename.endswith('.json'):
-                path = os.path.join(app.config['HISTORY_FOLDER'], filename)
-                with open(path, 'r') as f:
-                    data = json.load(f)
-                    items.append({
-                        'id': data.get('id'),
-                        'filename': data.get('filename'),
-                        'timestamp': data.get('timestamp'),
-                        'record_count': data.get('record_count')
-                    })
-        # Sort by timestamp descending
-        items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-        return jsonify({'history': items[:10]})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    """Lists recent historical audits for the logged-in user, falling back to local files if anonymous."""
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('SELECT id, filename, timestamp, record_count FROM projects WHERE user_id = ? ORDER BY timestamp DESC', (user_id,))
+            rows = c.fetchall()
+            conn.close()
+            items = [{'id': r[0], 'filename': r[1], 'timestamp': r[2], 'record_count': r[3]} for r in rows]
+            return jsonify({'history': items})
+        except Exception as e:
+            return jsonify({'error': f"Failed to retrieve user history: {str(e)}"}), 500
+    else:
+        try:
+            items = []
+            for filename in os.listdir(app.config['HISTORY_FOLDER']):
+                if filename.endswith('.json'):
+                    path = os.path.join(app.config['HISTORY_FOLDER'], filename)
+                    with open(path, 'r') as f:
+                        data = json.load(f)
+                        items.append({
+                            'id': data.get('id'),
+                            'filename': data.get('filename'),
+                            'timestamp': data.get('timestamp'),
+                            'record_count': data.get('record_count')
+                        })
+            items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            return jsonify({'history': items[:10]})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 @app.route('/api/history/load/<history_id>', methods=['GET'])
 def api_load_history(history_id):
-    """Loads a previous analysis session from history JSON."""
+    """Loads a previous analysis session from SQLite DB or local JSON fallback."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT meta_json, converted_csv_path, cleaned_csv_path FROM projects WHERE id = ?', (history_id,))
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            data = json.loads(row[0])
+            session_state['filename'] = data.get('filename')
+            session_state['converted_csv_path'] = row[1] or data.get('converted_csv_path')
+            session_state['cleaned_csv_path'] = row[2] or data.get('cleaned_csv_path')
+            session_state['kpis'] = data.get('kpis')
+            session_state['insights'] = data.get('insights')
+            session_state['eda_results'] = data.get('eda')
+            session_state['outliers'] = data.get('outliers')
+            session_state['cleaning_log'] = data.get('cleaning_log', [])
+            
+            profile = data.get('datasetMetadata')
+            session_state['profile'] = profile
+            session_state['cleaned_profile'] = profile
+            return jsonify(data)
+    except Exception as e:
+        pass
+        
     history_path = os.path.join(app.config['HISTORY_FOLDER'], f"{history_id}.json")
     if not os.path.exists(history_path):
         return jsonify({'error': 'Session history item not found.'}), 404

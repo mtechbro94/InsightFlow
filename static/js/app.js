@@ -1536,8 +1536,149 @@ function runSimulatorInference() {
     }, 150);
 }
 
+// 14. Multi-Tenant Workspace & Authentication Routes (Option J)
+let authMode = 'login';
+
+function showMarketingHome() {
+    document.getElementById('marketing-view').classList.remove('hidden');
+    document.getElementById('workspace-view').classList.add('hidden');
+    document.getElementById('step-cleaning').classList.add('hidden');
+    document.getElementById('step-dashboard').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function openAuthModal(mode = 'login') {
+    authMode = mode;
+    document.getElementById('auth-modal').classList.remove('hidden');
+    document.getElementById('auth-error').classList.add('hidden');
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    updateAuthModalUI();
+}
+
+function closeAuthModal() {
+    document.getElementById('auth-modal').classList.add('hidden');
+}
+
+function toggleAuthMode() {
+    authMode = (authMode === 'login') ? 'register' : 'login';
+    document.getElementById('auth-error').classList.add('hidden');
+    updateAuthModalUI();
+}
+
+function updateAuthModalUI() {
+    const title = document.getElementById('auth-modal-title');
+    const desc = document.getElementById('auth-modal-desc');
+    const submitBtnSpan = document.getElementById('auth-submit-btn').querySelector('span');
+    const prompt = document.getElementById('auth-toggle-prompt');
+    
+    if (authMode === 'login') {
+        title.textContent = "Sign In to InsightFlow";
+        desc.textContent = "Access your private multi-tenant workspaces";
+        submitBtnSpan.textContent = "Sign In";
+        prompt.innerHTML = `Don't have an account? <a href="#" onclick="toggleAuthMode(); return false;" class="text-indigo-400 font-bold hover:underline">Sign Up</a>`;
+    } else {
+        title.textContent = "Create Workspace Account";
+        desc.textContent = "Unlock unlimited projects history and ML models";
+        submitBtnSpan.textContent = "Create Account";
+        prompt.innerHTML = `Already have an account? <a href="#" onclick="toggleAuthMode(); return false;" class="text-indigo-400 font-bold hover:underline">Sign In</a>`;
+    }
+}
+
+async function submitAuthForm() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    
+    if (!username || !password) {
+        errEl.textContent = "Please fill in all credentials.";
+        errEl.classList.remove('hidden');
+        return;
+    }
+    
+    const url = (authMode === 'login') ? '/api/auth/login' : '/api/auth/register';
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const result = await response.json();
+        
+        if (!response.ok) {
+            errEl.textContent = result.error || "Authentication failed.";
+            errEl.classList.remove('hidden');
+            return;
+        }
+        
+        closeAuthModal();
+        if (authMode === 'register') {
+            alert("Registration successful! You can now log in.");
+            openAuthModal('login');
+        } else {
+            await checkAuthStatus();
+        }
+    } catch (e) {
+        errEl.textContent = "Server communication crashed: " + e.message;
+        errEl.classList.remove('hidden');
+    }
+}
+
+async function logout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        datasetMetadata = null;
+        activeDashboardData = null;
+        await checkAuthStatus();
+    } catch (e) {
+        console.warn("Logout failed: " + e.message);
+    }
+}
+
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/api/auth/status');
+        const result = await response.json();
+        
+        const authContainer = document.getElementById('navbar-auth');
+        
+        if (result.logged_in) {
+            authContainer.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <span class="text-indigo-300 font-semibold font-mono">Tenant: ${result.username}</span>
+                    <button onclick="logout()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 font-semibold text-slate-300 rounded-lg transition-colors">Sign Out</button>
+                </div>
+            `;
+            document.getElementById('marketing-view').classList.add('hidden');
+            document.getElementById('workspace-view').classList.remove('hidden');
+            loadHistoryList();
+        } else {
+            authContainer.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <button onclick="openAuthModal('login')" class="px-3.5 py-1.5 text-slate-300 hover:text-white font-semibold transition-colors">Sign In</button>
+                    <button onclick="openAuthModal('register')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all">Sign Up</button>
+                </div>
+            `;
+            document.getElementById('marketing-view').classList.remove('hidden');
+            document.getElementById('workspace-view').classList.add('hidden');
+            document.getElementById('step-cleaning').classList.add('hidden');
+            document.getElementById('step-dashboard').classList.add('hidden');
+        }
+    } catch (e) {
+        console.warn("Auth status lookup failed: " + e.message);
+    }
+}
+
 // Window load event bindings
 document.addEventListener('DOMContentLoaded', () => {
-    loadHistoryList();
+    checkAuthStatus();
 });
 

@@ -29,117 +29,227 @@
 
     <!-- Navbar -->
     <nav class="bg-slate-900/50 backdrop-blur-md border-b border-slate-900 px-8 py-4 flex justify-between items-center shadow-lg sticky top-0 z-40">
-        <div class="flex items-center space-x-3">
-            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-                <path d="M22 12A10 10 0 0 0 12 2v10z" stroke="url(#logoGrad)" />
-                <defs>
-                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#8b5cf6" />
-                        <stop offset="100%" stop-color="#f472b6" />
-                    </linearGradient>
-                </defs>
-            </svg>
-            <div>
-                <span class="text-xl font-extrabold tracking-tight text-white block">Insight<span class="text-indigo-400">Flow</span></span>
-                <span class="text-[10px] text-slate-500 block -mt-1 tracking-wider uppercase font-semibold">Automated Analytics Suite</span>
+        <div class="flex items-center space-x-8">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showMarketingHome()">
+                <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                    <path d="M22 12A10 10 0 0 0 12 2v10z" stroke="url(#logoGrad)" />
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#8b5cf6" />
+                            <stop offset="100%" stop-color="#f472b6" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div>
+                    <span class="text-xl font-extrabold tracking-tight text-white block">Insight<span class="text-indigo-400">Flow</span></span>
+                    <span class="text-[10px] text-slate-500 block -mt-1 tracking-wider uppercase font-semibold">Automated Analytics Suite</span>
+                </div>
+            </div>
+            <!-- Navigation Links -->
+            <div class="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-400">
+                <a href="#marketing-features" class="hover:text-white transition-colors">Features</a>
+                <a href="#marketing-pricing" class="hover:text-white transition-colors">Pricing</a>
+                <a href="#marketing-faq" class="hover:text-white transition-colors">FAQs</a>
             </div>
         </div>
         <div class="flex items-center space-x-4">
-            <span class="text-xs text-slate-400 bg-slate-950 border border-slate-900 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+            <span class="text-xs text-slate-400 bg-slate-950 border border-slate-900 px-3 py-1.5 rounded-full hidden sm:flex items-center gap-1.5">
                 <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 Grok AI Engine Connected
             </span>
+            <!-- Authentication Status -->
+            <div id="navbar-auth" class="flex items-center space-x-3 text-xs">
+                <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all">Sign In</button>
+            </div>
         </div>
     </nav>
 
     <!-- Main Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 flex flex-col space-y-12">
         
-        <!-- STEP 1: Landing & Upload Panel -->
-        <section id="step-upload" class="space-y-16 py-8">
+        <!-- MARKETING HOMEPAGE VIEW (Visible to Guest Users) -->
+        <div id="marketing-view" class="space-y-24 py-8">
             <!-- Hero Header -->
-            <div class="text-center space-y-4 max-w-3xl mx-auto">
-                <span class="px-3 py-1 text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-full uppercase tracking-wider">AI-Powered Analytics</span>
-                <h1 class="text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            <div class="text-center space-y-6 max-w-4xl mx-auto">
+                <span class="px-3 py-1 text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-full uppercase tracking-wider">Enterprise Business Intelligence</span>
+                <h1 class="text-5xl md:text-6xl font-black tracking-tight text-white leading-tight">
                     Turn Raw Datasets Into <br>
                     <span class="text-gradient">Executive Dashboards</span> Instantly
                 </h1>
-                <p class="text-base text-slate-400 max-w-2xl mx-auto">
-                    Upload any CSV, TSV, Excel, or JSON. Our pipeline automatically converts, profiles, cleans, imputes missing data, isolates outliers, and renders a business-focused dashboard.
+                <p class="text-lg text-slate-400 max-w-3xl mx-auto">
+                    A comprehensive automated data preparation and predictive analysis platform. Ingest CSV, Excel, or JSON files to clean, impute, model outcomes, and converse with an AI analyst instantly.
                 </p>
+                <div class="flex justify-center items-center space-x-4 pt-4">
+                    <button onclick="openAuthModal('register')" class="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-white text-sm rounded-xl shadow-xl shadow-indigo-600/25 transition-all">Create Free Account</button>
+                    <button onclick="scrollToSection('marketing-features')" class="px-6 py-3.5 bg-slate-900 hover:bg-slate-850 font-bold text-slate-300 text-sm rounded-xl border border-slate-800 transition-all">Explore Features</button>
+                </div>
             </div>
 
-            <!-- Upload Zone -->
-            <div class="max-w-2xl mx-auto w-full bg-slate-900/60 border border-slate-900/80 p-8 rounded-3xl shadow-2xl relative">
-                <!-- Dropzone Area -->
-                <div id="drop-zone" class="w-full flex flex-col items-center justify-center px-6 py-12 bg-slate-950 text-indigo-500 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500 transition-all duration-300 group border-glow">
-                    <input type="file" id="dataset-file-input" class="hidden" onchange="handleFileUpload(this.files[0])">
-                    <label for="dataset-file-input" class="w-full h-full flex flex-col items-center justify-center cursor-pointer">
-                        <div class="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400 mb-4 group-hover:scale-110 transition-transform duration-300">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            <!-- Features Showcase Section -->
+            <section id="marketing-features" class="space-y-12">
+                <div class="text-center space-y-3">
+                    <h2 class="text-3xl font-black tracking-tight text-white">Full-Stack Analytics Pipeline</h2>
+                    <p class="text-sm text-slate-400 max-w-xl mx-auto">Everything you need to transform messy data sheets into boardroom-ready intelligence.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         </div>
-                        <span class="text-base text-slate-200 group-hover:text-indigo-300 font-bold transition-colors">Drag and drop file here, or click to browse</span>
-                        <span class="text-xs text-slate-500 mt-2">Supports CSV, TSV, Excel (.xlsx, .xls), and JSON (Max 50MB)</span>
-                    </label>
+                        <h3 class="text-lg font-bold text-white">Interactive Copilot Chat</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Ask complex questions to our agentic AI analyst. Drill down, query trends, request calculations, and review Plotly visualizations inside a live chat thread.
+                        </p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z"></path></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Multi-Mode ML Sandbox</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Train regression, classification, or KMeans clustering models. Evaluate metrics dynamically, display confusion matrix heatmaps, and test future outcome simulations via sliders.
+                        </p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">White-Label PDF Reports</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Export PDF summaries of your data audits. Upload brand logos, customize corporate hex code headers, select pages, and generate boardroom-ready downloads instantly.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SaaS Pricing Section -->
+            <section id="marketing-pricing" class="space-y-12">
+                <div class="text-center space-y-3">
+                    <h2 class="text-3xl font-black tracking-tight text-white">Flexible Pricing Plans</h2>
+                    <p class="text-sm text-slate-400 max-w-xl mx-auto">Start for free and upgrade as your team's analytics requirements expand.</p>
                 </div>
 
-                <!-- Loading Spinner (Hidden by default) -->
-                <div id="upload-loading" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center space-y-4">
-                    <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <div class="text-center">
-                        <h4 class="text-sm font-bold text-white">Ingesting File</h4>
-                        <p class="text-xs text-slate-400 mt-1">Converting format and compiling column schemas...</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <!-- Free Plan -->
+                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl flex flex-col justify-between space-y-6">
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-widest">Free Sandbox</h3>
+                            <div class="text-3xl font-black text-white">$0 <span class="text-xs text-slate-500">/ forever</span></div>
+                            <ul class="text-xs text-slate-400 space-y-2">
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> 3 Workspace projects</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Standard data sanitizing</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Basic insights & tables</li>
+                            </ul>
+                        </div>
+                        <button onclick="openAuthModal('register')" class="w-full py-2 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-xs font-bold text-white rounded-lg transition-colors">Start Free</button>
                     </div>
-                </div>
-            <!-- Recent Analyses History List (Option E) -->
-            <div id="recent-history-section" class="max-w-2xl mx-auto w-full hidden space-y-4">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
-                    <svg class="w-4 h-4 mr-1 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Recent Audited Projects
-                </h3>
-                <div id="recent-history-list" class="space-y-3">
-                    <!-- Historical items populated dynamically -->
-                </div>
-            </div>
-            </div>
 
-            <!-- Value Proposition Showcase -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <!-- Card 1 -->
-                <div class="bg-slate-900 border border-slate-900 p-6 rounded-2xl space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <!-- Pro Plan -->
+                    <div class="bg-indigo-600/10 border-2 border-indigo-500/80 p-8 rounded-2xl flex flex-col justify-between space-y-6 relative">
+                        <span class="absolute top-0 right-6 -translate-y-1/2 px-3 py-0.5 text-[10px] font-bold text-indigo-100 bg-indigo-500 rounded-full uppercase tracking-wider">Most Popular</span>
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-widest">Professional</h3>
+                            <div class="text-3xl font-black text-white">$49 <span class="text-xs text-slate-500">/ month</span></div>
+                            <ul class="text-xs text-slate-300 space-y-2">
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Unlimited projects history</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Complete ML Model sandboxes</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Custom white-labeled PDFs</li>
+                            </ul>
+                        </div>
+                        <button onclick="openAuthModal('register')" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white rounded-lg transition-colors shadow-lg shadow-indigo-600/20">Upgrade to Pro</button>
                     </div>
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Format Ingestion</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">Automatic format detection and conversion into clean structured datasets.</p>
-                </div>
-                <!-- Card 2 -->
-                <div class="bg-slate-900 border border-slate-900 p-6 rounded-2xl space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+
+                    <!-- Enterprise Plan -->
+                    <div class="bg-slate-900/40 border border-slate-900/80 p-8 rounded-2xl flex flex-col justify-between space-y-6">
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest">Enterprise</h3>
+                            <div class="text-3xl font-black text-white">Custom</div>
+                            <ul class="text-xs text-slate-400 space-y-2">
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Dedicated DB deployment</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> Live SQL database sync</li>
+                                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg> SLA support SLA</li>
+                            </ul>
+                        </div>
+                        <button onclick="alert('Contact sales at corporate@insightflow.com')" class="w-full py-2 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-xs font-bold text-white rounded-lg transition-colors">Contact Corporate</button>
                     </div>
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Dynamic Sanitizing</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">Imputes missing cells using mode/median and isolates outliers dynamically.</p>
                 </div>
-                <!-- Card 3 -->
-                <div class="bg-slate-900 border border-slate-900 p-6 rounded-2xl space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+            </section>
+
+            <!-- FAQ Section -->
+            <section id="marketing-faq" class="space-y-12 max-w-4xl mx-auto">
+                <div class="text-center space-y-3">
+                    <h2 class="text-3xl font-black tracking-tight text-white">Frequently Asked Questions</h2>
+                    <p class="text-sm text-slate-400">Clear answers to common questions about InsightFlow's data processors.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-slate-900/30 border border-slate-900 p-5 rounded-xl space-y-2">
+                        <h4 class="text-sm font-bold text-white">Is my data secure in the private database?</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">Yes. Every project metadata payload is stored securely inside a private, user-isolated relational SQLite database. Files are never shared publicly.</p>
                     </div>
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">KPI-Only Charts</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">Restricts plotting specifically to detected KPI metrics, filtering out low-insight noise.</p>
-                </div>
-                <!-- Card 4 -->
-                <div class="bg-slate-900 border border-slate-900 p-6 rounded-2xl space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <div class="bg-slate-900/30 border border-slate-900 p-5 rounded-xl space-y-2">
+                        <h4 class="text-sm font-bold text-white">What file formats does the upload tool accept?</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">We support standard tables: CSV (comma-separated), TSV (tab-separated), Excel (.xlsx, .xls), and structured JSON list arrays.</p>
                     </div>
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Export & Reports</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">Exporters for clean CSV, standalone HTML dashboards, and multi-page PDFs.</p>
+                    <div class="bg-slate-900/30 border border-slate-900 p-5 rounded-xl space-y-2">
+                        <h4 class="text-sm font-bold text-white">How does the dynamic outcome simulator compute forecasts?</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">It fits a live Random Forest regressor or classifier to the training targets, then streams real-time feature coordinates to calculate predictions synchronously.</p>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </div>
+
+        <!-- SAAS WORKSPACE CONTAINER (Visible only when logged in) -->
+        <div id="workspace-view" class="hidden space-y-12">
+            <!-- STEP 1: Landing & Upload Panel -->
+            <section id="step-upload" class="space-y-16 py-8">
+                <!-- Workspace Welcome Title -->
+                <div class="text-center space-y-2 max-w-2xl mx-auto">
+                    <h2 class="text-3xl font-black text-white">Workspace Project Dashboard</h2>
+                    <p class="text-xs text-slate-400">Upload a raw dataset below to begin profiling, sanitizing, and analytical modeling.</p>
+                </div>
+                
+                <!-- Upload Zone -->
+                <div class="max-w-2xl mx-auto w-full bg-slate-900/60 border border-slate-900/80 p-8 rounded-3xl shadow-2xl relative">
+                    <div id="drop-zone" class="w-full flex flex-col items-center justify-center px-6 py-12 bg-slate-950 text-indigo-500 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500 transition-all duration-300 group border-glow">
+                        <input type="file" id="dataset-file-input" class="hidden" onchange="handleFileUpload(this.files[0])">
+                        <label for="dataset-file-input" class="w-full h-full flex flex-col items-center justify-center cursor-pointer">
+                            <div class="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400 mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            </div>
+                            <span class="text-base text-slate-200 group-hover:text-indigo-300 font-bold transition-colors">Drag and drop file here, or click to browse</span>
+                            <span class="text-xs text-slate-500 mt-2">Supports CSV, TSV, Excel (.xlsx, .xls), and JSON (Max 50MB)</span>
+                        </label>
+                    </div>
+
+                    <!-- Loading Spinner -->
+                    <div id="upload-loading" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center space-y-4">
+                        <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        <div class="text-center">
+                            <h4 class="text-sm font-bold text-white">Ingesting File</h4>
+                            <p class="text-xs text-slate-400 mt-1">Converting format and compiling column schemas...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Saved Projects List -->
+                <div id="recent-history-section" class="max-w-2xl mx-auto w-full hidden space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                        <svg class="w-4 h-4 mr-1 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Saved Workspace Projects
+                    </h3>
+                    <div id="recent-history-list" class="space-y-3">
+                        <!-- Populated dynamically from SQLite -->
+                    </div>
+                </div>
+            </section>
 
         <!-- STEP 2: Profile & Cleaning Setup (Hidden initially) -->
         <section id="step-cleaning" class="hidden bg-slate-900/60 border border-slate-900/80 rounded-3xl p-8 shadow-2xl space-y-8 transition-all duration-300">
@@ -689,6 +799,45 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     <span>Build & Download PDF</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUTHENTICATION DIALOG MODAL (Option J) -->
+    <div id="auth-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div class="p-8 space-y-6">
+                <div class="text-center space-y-1">
+                    <h3 id="auth-modal-title" class="text-xl font-bold text-white">Sign In to InsightFlow</h3>
+                    <p id="auth-modal-desc" class="text-xs text-slate-400">Access your private multi-tenant workspaces</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Username</label>
+                        <input type="text" id="auth-username" placeholder="Enter username" class="w-full bg-slate-950 text-slate-200 text-xs px-3.5 py-2.5 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Password</label>
+                        <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-slate-950 text-slate-200 text-xs px-3.5 py-2.5 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                    
+                    <div id="auth-error" class="hidden text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 p-3 rounded-lg">
+                        <!-- Filled dynamically -->
+                    </div>
+                    
+                    <button id="auth-submit-btn" onclick="submitAuthForm()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-white text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center space-x-1.5">
+                        <span>Sign In</span>
+                    </button>
+                </div>
+                
+                <div class="text-center border-t border-slate-850 pt-4">
+                    <span id="auth-toggle-prompt" class="text-xs text-slate-400">Don't have an account? <a href="#" onclick="toggleAuthMode(); return false;" class="text-indigo-400 font-bold hover:underline">Sign Up</a></span>
+                </div>
             </div>
         </div>
     </div>
