@@ -910,13 +910,30 @@ def api_predictive_train():
     predictor_cols = data.get('predictors', [])
     n_clusters = int(data.get('n_clusters', 3))
     
+    n_estimators = int(data.get('n_estimators', 50))
+    max_depth = data.get('max_depth', 'None')
+    if max_depth != 'None' and max_depth is not None:
+        try:
+            max_depth = int(max_depth)
+        except ValueError:
+            max_depth = None
+    min_samples_split = int(data.get('min_samples_split', 2))
+    autotune = bool(data.get('autotune', False))
+    
     if not target_col or not predictor_cols:
         return jsonify({'error': 'Please select both target and predictor columns.'}), 400
         
     try:
         df = pd.read_csv(active_csv_path)
         
-        model_data = analyzer.train_predictive_model(df, target_col, predictor_cols, n_clusters=n_clusters)
+        model_data = analyzer.train_predictive_model(
+            df, target_col, predictor_cols,
+            n_clusters=n_clusters,
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            autotune=autotune
+        )
         
         # Cache model state in session
         session_state['active_model'] = {
@@ -934,7 +951,8 @@ def api_predictive_train():
         resp = {
             'mode': model_data['mode'],
             'metrics': model_data['metrics'],
-            'predictor_meta': model_data['predictor_meta']
+            'predictor_meta': model_data['predictor_meta'],
+            'tuned_params': model_data.get('tuned_params')
         }
         
         if model_data['mode'] == 'clustering':

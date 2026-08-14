@@ -1331,11 +1331,24 @@ async function trainPredictiveModel() {
     
     showSpinner("Building dynamic machine learning model...");
     
+    const nEst = document.getElementById('ml-param-estimators').value;
+    const mDepth = document.getElementById('ml-param-depth').value;
+    const mSplit = document.getElementById('ml-param-split').value;
+    const autoTune = document.getElementById('ml-opt-autotune').checked;
+    
     try {
         const response = await fetch('/api/predictive/train', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target, predictors, n_clusters: parseInt(nClusters) })
+            body: JSON.stringify({
+                target,
+                predictors,
+                n_clusters: parseInt(nClusters),
+                n_estimators: parseInt(nEst),
+                max_depth: mDepth,
+                min_samples_split: parseInt(mSplit),
+                autotune: autoTune
+            })
         });
         
         const result = await response.json();
@@ -1344,6 +1357,18 @@ async function trainPredictiveModel() {
         if (!response.ok) {
             alert("Model build failed: " + (result.error || "Unknown error"));
             return;
+        }
+        
+        // Show hyperparams status badge
+        const badge = document.getElementById('ml-parameters-badge');
+        if (badge) {
+            badge.classList.remove('hidden');
+            const tp = result.tuned_params || {};
+            const nest = tp.n_estimators || nEst;
+            const depth = tp.max_depth === null ? 'Unlimited' : tp.max_depth;
+            const split = tp.min_samples_split || mSplit;
+            document.getElementById('ml-parameters-text').textContent = `n_estimators: ${nest} | max_depth: ${depth} | min_split: ${split}`;
+            document.getElementById('ml-autotune-status').textContent = autoTune ? "Auto-Tuned" : "Manual";
         }
         
         if (result.mode === 'clustering') {
@@ -1872,6 +1897,20 @@ async function evaluateThresholdAlerts() {
         });
     } catch (e) {
         listContainer.innerHTML = `<div class="text-rose-500 text-center py-2">Error: ${e.message}</div>`;
+    }
+}
+
+let hyperparamsCollapsed = true;
+function toggleHyperparamsCollapse() {
+    hyperparamsCollapsed = !hyperparamsCollapsed;
+    const fields = document.getElementById('ml-hyperparams-fields');
+    const arrow = document.getElementById('hp-arrow');
+    if (hyperparamsCollapsed) {
+        fields.classList.add('hidden');
+        arrow.classList.remove('rotate-180');
+    } else {
+        fields.classList.remove('hidden');
+        arrow.classList.add('rotate-180');
     }
 }
 

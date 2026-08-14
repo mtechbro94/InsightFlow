@@ -877,10 +877,10 @@ def generate_rule_based_insights(df, eda_results, columns_info, cleaning_log, ou
 
     return insights
 
-def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
+def train_predictive_model(df, target_col, predictor_cols, n_clusters=3, n_estimators=50, max_depth=None, min_samples_split=2, autotune=False):
     """
     Trains an ML model (RandomForestRegressor, RandomForestClassifier, or KMeans Clustering)
-    depending on the selected target column and predictor features.
+    depending on the selected target column and predictor features. Includes hyperparameter tuning.
     """
     from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
     from sklearn.cluster import KMeans
@@ -1080,10 +1080,50 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
         
     X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
     
+    # Fit classification or regression model
+    best_params = {
+        'n_estimators': n_estimators,
+        'max_depth': max_depth,
+        'min_samples_split': min_samples_split
+    }
+    
+    md_val = None if max_depth == 'None' or max_depth is None else int(max_depth)
+    
+    if autotune:
+        from sklearn.model_selection import GridSearchCV
+        param_grid = {
+            'n_estimators': [10, 50, 100],
+            'max_depth': [5, 10, None]
+        }
+        if is_classification:
+            grid = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=3, scoring='accuracy', n_jobs=-1)
+            grid.fit(X_train, y_train)
+            model = grid.best_estimator_
+            best_params.update(grid.best_params_)
+        else:
+            grid = GridSearchCV(RandomForestRegressor(random_state=42), param_grid, cv=3, scoring='r2', n_jobs=-1)
+            grid.fit(X_train, y_train)
+            model = grid.best_estimator_
+            best_params.update(grid.best_params_)
+    else:
+        if is_classification:
+            model = RandomForestClassifier(
+                n_estimators=int(n_estimators),
+                max_depth=md_val,
+                min_samples_split=int(min_samples_split),
+                random_state=42
+            )
+            model.fit(X_train, y_train)
+        else:
+            model = RandomForestRegressor(
+                n_estimators=int(n_estimators),
+                max_depth=md_val,
+                min_samples_split=int(min_samples_split),
+                random_state=42
+            )
+            model.fit(X_train, y_train)
+            
     if is_classification:
-        model = RandomForestClassifier(n_estimators=50, random_state=42)
-        model.fit(X_train, y_train)
-        
         y_pred = model.predict(X_test)
         acc = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
@@ -1115,12 +1155,10 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
             'predictor_meta': predictor_meta,
             'encoders': encoders,
             'target_encoder': target_encoder,
-            'model': model
+            'model': model,
+            'tuned_params': best_params
         }
     else:
-        model = RandomForestRegressor(n_estimators=50, random_state=42)
-        model.fit(X_train, y_train)
-        
         y_pred = model.predict(X_test)
         r2 = r2_score(y_test, y_pred)
         mae = mean_absolute_error(y_test, y_pred)
@@ -1156,7 +1194,8 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
             'actual_vs_predicted': actual_pred_list,
             'predictor_meta': predictor_meta,
             'encoders': encoders,
-            'model': model
+            'model': model,
+            'tuned_params': best_params
         }
 
 def predict_target(model, encoders, predictor_meta, inputs, target_encoder=None, mode='regression', pca=None):
