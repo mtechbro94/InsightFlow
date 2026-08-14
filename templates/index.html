@@ -23,47 +23,76 @@
             box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.2);
             border-color: rgba(139, 92, 246, 0.4);
         }
+        .nav-link {
+            position: relative;
+            padding: 0.25rem 0;
+            transition: color 0.3s ease;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #6366f1, #d946ef);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col hero-gradient">
 
-    <!-- Navbar -->
-    <nav class="bg-slate-900/50 backdrop-blur-md border-b border-slate-900 px-8 py-4 flex justify-between items-center shadow-lg sticky top-0 z-40">
-        <div class="flex items-center space-x-8">
-            <div class="flex items-center space-x-3 cursor-pointer" onclick="showMarketingHome()">
-                <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-                    <path d="M22 12A10 10 0 0 0 12 2v10z" stroke="url(#logoGrad)" />
-                    <defs>
-                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#8b5cf6" />
-                            <stop offset="100%" stop-color="#f472b6" />
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <div>
-                    <span class="text-xl font-extrabold tracking-tight text-white block">Insight<span class="text-indigo-400">Flow</span></span>
-                    <span class="text-[10px] text-slate-500 block -mt-1 tracking-wider uppercase font-semibold">Automated Analytics Suite</span>
+    <!-- Floating Glossy Navbar -->
+    <div class="w-full max-w-7xl mx-auto px-6 pt-6 sticky top-0 z-50">
+        <nav class="px-8 py-3 flex justify-between items-center rounded-3xl border border-slate-800/60 bg-slate-950/70 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+            <div class="flex items-center space-x-8">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="showMarketingHome()">
+                    <!-- Abstract Vector Data-Node Logo -->
+                    <svg class="w-8 h-8" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 22L12 10L18 20L26 6" stroke="url(#logoPathGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        <circle cx="6" cy="22" r="3.5" fill="#6366f1" filter="url(#glow)" />
+                        <circle cx="12" cy="10" r="3.5" fill="#a855f7" filter="url(#glow)" />
+                        <circle cx="18" cy="20" r="3.5" fill="#d946ef" filter="url(#glow)" />
+                        <circle cx="26" cy="6" r="3.5" fill="#ec4899" filter="url(#glow)" />
+                        <defs>
+                            <linearGradient id="logoPathGrad" x1="6" y1="22" x2="26" y2="6" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#6366f1" />
+                                <stop offset="50%" stop-color="#a855f7" />
+                                <stop offset="100%" stop-color="#ec4899" />
+                            </linearGradient>
+                            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="1.5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+                    </svg>
+                    <div class="leading-none">
+                        <span class="text-base font-black tracking-wider text-white block uppercase">Insight<span class="text-indigo-400">Flow</span></span>
+                        <span class="text-[9px] text-slate-500 block tracking-widest uppercase font-bold mt-0.5">Proprietary AI Analytics</span>
+                    </div>
+                </div>
+                <!-- Navigation Links -->
+                <div class="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-400">
+                    <a href="#marketing-features" class="nav-link hover:text-white transition-colors">Features</a>
+                    <a href="#marketing-pricing" class="nav-link hover:text-white transition-colors">Pricing</a>
+                    <a href="#marketing-faq" class="nav-link hover:text-white transition-colors">FAQs</a>
                 </div>
             </div>
-            <!-- Navigation Links -->
-            <div class="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-400">
-                <a href="#marketing-features" class="hover:text-white transition-colors">Features</a>
-                <a href="#marketing-pricing" class="hover:text-white transition-colors">Pricing</a>
-                <a href="#marketing-faq" class="hover:text-white transition-colors">FAQs</a>
+            <div class="flex items-center space-x-4">
+                <span class="text-xs text-slate-400 bg-slate-900 border border-slate-800/80 px-3.5 py-1.5 rounded-full hidden lg:flex items-center gap-1.5 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                    InsightFlow Proprietary Neural Core (16-bit Quantized)
+                </span>
+                <!-- Authentication Status -->
+                <div id="navbar-auth" class="flex items-center space-x-3 text-xs">
+                    <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all">Sign In</button>
+                </div>
             </div>
-        </div>
-        <div class="flex items-center space-x-4">
-            <span class="text-xs text-slate-400 bg-slate-950 border border-slate-900 px-3 py-1.5 rounded-full hidden sm:flex items-center gap-1.5">
-                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                InsightFlow Proprietary Neural Core (16-bit Quantized)
-            </span>
-            <!-- Authentication Status -->
-            <div id="navbar-auth" class="flex items-center space-x-3 text-xs">
-                <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg shadow-indigo-600/20 transition-all">Sign In</button>
-            </div>
-        </div>
-    </nav>
+        </nav>
+    </div>
 
     <!-- Main Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 flex flex-col space-y-12">
