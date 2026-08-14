@@ -13,7 +13,8 @@ const THEMES = {
         grid: '#1e293b',
         text: '#94a3b8',
         bodyBg: '#0b0f19',
-        cardBg: '#0f172a'
+        cardBg: '#0f172a',
+        isLight: false
     },
     emerald: {
         primary: '#10b981',
@@ -21,7 +22,8 @@ const THEMES = {
         grid: '#064e3b',
         text: '#a7f3d0',
         bodyBg: '#021e17',
-        cardBg: '#022c22'
+        cardBg: '#022c22',
+        isLight: false
     },
     retro: {
         primary: '#f59e0b',
@@ -29,7 +31,8 @@ const THEMES = {
         grid: '#292524',
         text: '#f7fee7',
         bodyBg: '#141210',
-        cardBg: '#1c1917'
+        cardBg: '#1c1917',
+        isLight: false
     },
     slate: {
         primary: '#cbd5e1',
@@ -37,7 +40,17 @@ const THEMES = {
         grid: '#334155',
         text: '#cbd5e1',
         bodyBg: '#0f172a',
-        cardBg: '#1e293b'
+        cardBg: '#1e293b',
+        isLight: false
+    },
+    snow: {
+        primary: '#4f46e5',
+        secondary: '#06b6d4',
+        grid: '#e2e8f0',
+        text: '#1e293b',
+        bodyBg: '#f8fafc',
+        cardBg: '#ffffff',
+        isLight: true
     }
 };
 
@@ -899,6 +912,13 @@ function changeDashboardTheme(themeName) {
     if (!THEMES[themeName]) return;
     currentTheme = themeName;
     const theme = THEMES[themeName];
+
+    // Toggle body light theme class
+    if (theme.isLight) {
+        document.body.classList.add('light-theme');
+    } else {
+        document.body.classList.remove('light-theme');
+    }
 
     // Apply color variables to document elements
     document.documentElement.style.setProperty('--body-bg', theme.bodyBg);

@@ -41,6 +41,93 @@
         .nav-link:hover::after {
             width: 100%;
         }
+
+        /* Light Theme Overrides (Option C / Snow Mode) */
+        body.light-theme {
+            background-color: #f8fafc !important;
+            background-image: radial-gradient(at 50% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%), radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.05) 0px, transparent 50%) !important;
+            color: #0f172a !important;
+        }
+        body.light-theme .bg-slate-900, 
+        body.light-theme .bg-slate-950,
+        body.light-theme .bg-slate-955\/30,
+        body.light-theme .bg-slate-955\/60,
+        body.light-theme .bg-slate-950\/30,
+        body.light-theme .bg-slate-900\/50,
+        body.light-theme .bg-slate-900\/40,
+        body.light-theme .bg-slate-950\/40 {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+        }
+        body.light-theme .text-slate-400, 
+        body.light-theme .text-slate-500,
+        body.light-theme .text-slate-450 {
+            color: #64748b !important;
+        }
+        body.light-theme .text-slate-300, 
+        body.light-theme .text-slate-200, 
+        body.light-theme .text-slate-100, 
+        body.light-theme .text-white,
+        body.light-theme h1,
+        body.light-theme h2,
+        body.light-theme h3,
+        body.light-theme h4 {
+            color: #0f172a !important;
+        }
+        body.light-theme .border-slate-800, 
+        body.light-theme .border-slate-850, 
+        body.light-theme .border-slate-900,
+        body.light-theme .border-slate-700 {
+            border-color: #e2e8f0 !important;
+        }
+        body.light-theme select,
+        body.light-theme input,
+        body.light-theme textarea {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        body.light-theme .bg-slate-950\/50,
+        body.light-theme .bg-slate-955\/50,
+        body.light-theme .bg-slate-955\/40 {
+            background-color: rgba(241, 245, 249, 0.8) !important;
+        }
+        body.light-theme #theme-selector,
+        body.light-theme select {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
+            background-size: 1.25rem !important;
+            background-position: right 0.5rem center !important;
+            background-repeat: no-repeat !important;
+            padding-right: 2rem !important;
+            color: #334155 !important;
+            background-color: #ffffff !important;
+        }
+        body.light-theme .hover\:text-white:hover {
+            color: #4f46e5 !important;
+        }
+        body.light-theme .nav-link {
+            color: #64748b !important;
+        }
+        body.light-theme .nav-link:hover {
+            color: #0f172a !important;
+        }
+        body.light-theme .nav-link::after {
+            background: linear-gradient(90deg, #4f46e5, #06b6d4) !important;
+        }
+        body.light-theme .shadow-indigo-600\/20 {
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.1), 0 4px 6px -2px rgba(79, 70, 229, 0.05) !important;
+        }
+        body.light-theme #logo-wrapper span {
+            color: #0f172a !important;
+        }
+        body.light-theme .bg-slate-950 {
+            background-color: #f1f5f9 !important;
+        }
+        body.light-theme .text-indigo-400,
+        body.light-theme .text-indigo-300 {
+            color: #4f46e5 !important;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col hero-gradient">
@@ -69,7 +156,7 @@
                             </filter>
                         </defs>
                     </svg>
-                    <div class="leading-none">
+                    <div class="leading-none" id="logo-wrapper">
                         <span class="text-base font-black tracking-wider text-white block uppercase">Insight<span class="text-indigo-400">Flow</span></span>
                         <span class="text-[9px] text-slate-500 block tracking-widest uppercase font-bold mt-0.5">Proprietary AI Analytics</span>
                     </div>
@@ -397,6 +484,7 @@
                             <option value="emerald">🍃 Emerald Mint</option>
                             <option value="retro">🔥 Retro Amber</option>
                             <option value="slate">🪙 Slate Minimalist</option>
+                            <option value="snow">❄️ Snow Light Mode</option>
                         </select>
                     </div>
                     <a href="/api/download/csv" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center space-x-1.5">
