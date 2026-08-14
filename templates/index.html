@@ -483,8 +483,19 @@
                             
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Target Variable (To Predict)</label>
-                                <select id="predict-target-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
-                                    <!-- Populated dynamically with numerical variables -->
+                                <select id="predict-target-select" onchange="togglePredictiveTargetMode(this.value)" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                    <!-- Populated dynamically with variables -->
+                                </select>
+                            </div>
+                            
+                            <div id="clustering-k-container" class="hidden">
+                                <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Number of Clusters (K)</label>
+                                <select id="predict-k-select" class="w-full bg-slate-900 border border-slate-800 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none">
+                                    <option value="2">2 Clusters</option>
+                                    <option value="3" selected>3 Clusters</option>
+                                    <option value="4">4 Clusters</option>
+                                    <option value="5">5 Clusters</option>
+                                    <option value="6">6 Clusters</option>
                                 </select>
                             </div>
                             

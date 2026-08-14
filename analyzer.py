@@ -877,23 +877,90 @@ def generate_rule_based_insights(df, eda_results, columns_info, cleaning_log, ou
 
     return insights
 
-def train_predictive_model(df, target_col, predictor_cols):
+def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
     """
-    Trains a RandomForestRegressor predictive model on the dataset to target target_col using predictor_cols.
-    Handles numerical and categorical predictors.
+    Trains an ML model (RandomForestRegressor, RandomForestClassifier, or KMeans Clustering)
+    depending on the selected target column and predictor features.
     """
-    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, confusion_matrix
     from sklearn.preprocessing import LabelEncoder
     import numpy as np
+    import pandas as pd
 
-    # Drop rows where target or predictors are null
+    # 1. Unsupervised Clustering Mode
+    if target_col == '--clustering--':
+        subset_df = df[predictor_cols].dropna().copy()
+        if len(subset_df) < 10:
+            raise ValueError("Not enough valid data rows (minimum 10 required) after dropping missing cells.")
+            
+        X = subset_df.copy()
+        encoders = {}
+        predictor_meta = {}
+        
+        # Encode categorical columns
+        for col in predictor_cols:
+            col_series = X[col]
+            if col_series.dtype == 'object' or col_series.dtype.name == 'category':
+                le = LabelEncoder()
+                X[col] = le.fit_transform(col_series.astype(str))
+                encoders[col] = le
+                predictor_meta[col] = {
+                    'type': 'categorical',
+                    'categories': [str(c) for c in le.classes_],
+                    'default': str(col_series.mode().iloc[0]) if not col_series.mode().empty else str(col_series.iloc[0])
+                }
+            else:
+                predictor_meta[col] = {
+                    'type': 'numeric',
+                    'min': float(col_series.min()),
+                    'max': float(col_series.max()),
+                    'default': float(col_series.median())
+                }
+                
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
+        clusters = kmeans.fit_predict(X)
+        
+        pca = PCA(n_components=2, random_state=42)
+        X_pca = pca.fit_transform(X)
+        
+        sample_indices = subset_df.index
+        if len(subset_df) > 150:
+            np.random.seed(42)
+            sample_indices = np.random.choice(subset_df.index, 150, replace=False)
+            
+        chart_points = []
+        for idx in sample_indices:
+            idx_loc = list(subset_df.index).index(idx)
+            chart_points.append({
+                'x': float(X_pca[idx_loc, 0]),
+                'y': float(X_pca[idx_loc, 1]),
+                'cluster': int(clusters[idx_loc]),
+                'label': f"Row {idx}"
+            })
+            
+        return {
+            'mode': 'clustering',
+            'metrics': {
+                'silhouette_score': 0.0,
+                'inertia': float(kmeans.inertia_)
+            },
+            'chart_data': chart_points,
+            'predictor_meta': predictor_meta,
+            'encoders': encoders,
+            'model': kmeans,
+            'pca': pca
+        }
+
+    # 2. Supervised Modes (Regression & Classification)
     cols_to_use = [target_col] + predictor_cols
     subset_df = df[cols_to_use].dropna().copy()
-    
     if len(subset_df) < 10:
-        raise ValueError("Not enough valid data rows (minimum 10 rows required) after dropping missing value cells.")
+        raise ValueError("Not enough valid data rows (minimum 10 required) after dropping missing cells.")
         
     X = subset_df[predictor_cols].copy()
     y = subset_df[target_col].copy()
@@ -901,10 +968,8 @@ def train_predictive_model(df, target_col, predictor_cols):
     encoders = {}
     predictor_meta = {}
     
-    # Process each predictor column
     for col in predictor_cols:
         col_series = X[col]
-        # Check if categorical
         if col_series.dtype == 'object' or col_series.dtype.name == 'category':
             le = LabelEncoder()
             X[col] = le.fit_transform(col_series.astype(str))
@@ -915,7 +980,6 @@ def train_predictive_model(df, target_col, predictor_cols):
                 'default': str(col_series.mode().iloc[0]) if not col_series.mode().empty else str(col_series.iloc[0])
             }
         else:
-            # Numeric column
             predictor_meta[col] = {
                 'type': 'numeric',
                 'min': float(col_series.min()),
@@ -923,56 +987,99 @@ def train_predictive_model(df, target_col, predictor_cols):
                 'default': float(col_series.median())
             }
             
-    # Split training / test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    is_classification = False
+    target_encoder = None
     
-    model = RandomForestRegressor(n_estimators=50, random_state=42)
-    model.fit(X_train, y_train)
-    
-    # Evaluate
-    y_pred = model.predict(X_test)
-    r2 = r2_score(y_test, y_pred)
-    mae = mean_absolute_error(y_test, y_pred)
-    mse = mean_squared_error(y_test, y_pred)
-    
-    # Feature importances
-    importances_raw = model.feature_importances_
-    importances = []
-    for col, imp in zip(predictor_cols, importances_raw):
-        importances.append({
-            'feature': col,
-            'importance': float(imp)
-        })
-    importances.sort(key=lambda x: x['importance'], reverse=True)
-    
-    # Actual vs Predicted data points (sample of 150 rows for Plotly display)
-    y_test_pred = model.predict(X)
-    actual_pred_list = []
-    sample_indices = subset_df.index
-    if len(subset_df) > 150:
-        np.random.seed(42)
-        sample_indices = np.random.choice(subset_df.index, 150, replace=False)
+    # Classification check: non-numeric target OR categorical classes
+    if y.dtype == 'object' or y.dtype.name == 'category' or y.dtype == 'bool' or len(y.unique()) < 5:
+        is_classification = True
+        target_encoder = LabelEncoder()
+        y_encoded = target_encoder.fit_transform(y.astype(str))
+    else:
+        y_encoded = y.astype(float)
         
-    for idx in sample_indices:
-        actual_pred_list.append({
-            'actual': float(subset_df.loc[idx, target_col]),
-            'predicted': float(y_test_pred[list(subset_df.index).index(idx)])
-        })
+    X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+    
+    if is_classification:
+        model = RandomForestClassifier(n_estimators=50, random_state=42)
+        model.fit(X_train, y_train)
         
-    return {
-        'metrics': {
-            'r2': float(r2),
-            'mae': float(mae),
-            'mse': float(mse)
-        },
-        'importances': importances,
-        'actual_vs_predicted': actual_pred_list,
-        'encoders': encoders,
-        'predictor_meta': predictor_meta,
-        'model': model
-    }
+        y_pred = model.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+        prec = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+        
+        cm = confusion_matrix(y_test, y_pred)
+        classes = [str(c) for c in target_encoder.classes_]
+        cm_data = {
+            'z': cm.tolist(),
+            'x': classes,
+            'y': classes
+        }
+        
+        importances_raw = model.feature_importances_
+        importances = []
+        for col, imp in zip(predictor_cols, importances_raw):
+            importances.append({'feature': col, 'importance': float(imp)})
+        importances.sort(key=lambda x: x['importance'], reverse=True)
+        
+        return {
+            'mode': 'classification',
+            'metrics': {
+                'accuracy': float(acc),
+                'f1_score': float(f1),
+                'precision': float(prec)
+            },
+            'importances': importances,
+            'confusion_matrix': cm_data,
+            'predictor_meta': predictor_meta,
+            'encoders': encoders,
+            'target_encoder': target_encoder,
+            'model': model
+        }
+    else:
+        model = RandomForestRegressor(n_estimators=50, random_state=42)
+        model.fit(X_train, y_train)
+        
+        y_pred = model.predict(X_test)
+        r2 = r2_score(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        
+        importances_raw = model.feature_importances_
+        importances = []
+        for col, imp in zip(predictor_cols, importances_raw):
+            importances.append({'feature': col, 'importance': float(imp)})
+        importances.sort(key=lambda x: x['importance'], reverse=True)
+        
+        y_all_pred = model.predict(X)
+        actual_pred_list = []
+        sample_indices = subset_df.index
+        if len(subset_df) > 150:
+            np.random.seed(42)
+            sample_indices = np.random.choice(subset_df.index, 150, replace=False)
+            
+        for idx in sample_indices:
+            actual_pred_list.append({
+                'actual': float(subset_df.loc[idx, target_col]),
+                'predicted': float(y_all_pred[list(subset_df.index).index(idx)])
+            })
+            
+        return {
+            'mode': 'regression',
+            'metrics': {
+                'r2': float(r2),
+                'mae': float(mae),
+                'mse': float(mse)
+            },
+            'importances': importances,
+            'actual_vs_predicted': actual_pred_list,
+            'predictor_meta': predictor_meta,
+            'encoders': encoders,
+            'model': model
+        }
 
-def predict_target(model, encoders, predictor_meta, inputs):
+def predict_target(model, encoders, predictor_meta, inputs, target_encoder=None, mode='regression', pca=None):
     """
     Runs single row inference on the trained model.
     """
@@ -996,5 +1103,21 @@ def predict_target(model, encoders, predictor_meta, inputs):
             
     features_ordered = list(model.feature_names_in_) if hasattr(model, 'feature_names_in_') else list(inputs.keys())
     input_df = pd.DataFrame([row_data], columns=features_ordered)
-    prediction = model.predict(input_df)[0]
-    return float(prediction)
+    
+    if mode == 'clustering':
+        cluster_pred = model.predict(input_df)[0]
+        return f"Cluster {cluster_pred}"
+    elif mode == 'classification':
+        pred_class = model.predict(input_df)[0]
+        probs = model.predict_proba(input_df)[0]
+        max_prob = float(probs.max())
+        
+        if target_encoder:
+            class_label = str(target_encoder.inverse_transform([pred_class])[0])
+        else:
+            class_label = str(pred_class)
+            
+        return f"{class_label} ({max_prob * 100:.1f}% confidence)"
+    else:
+        prediction = model.predict(input_df)[0]
+        return float(prediction)

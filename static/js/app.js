@@ -1214,6 +1214,37 @@ async function calculatePivotTable() {
 }
 
 // 13. Predictive ML Sandbox Builder & Outcome Simulator (Option G)
+function togglePredictiveTargetMode(val) {
+    const kContainer = document.getElementById('clustering-k-container');
+    const button = document.querySelector('button[onclick="trainPredictiveModel()"]');
+    const labelMetrics = document.querySelectorAll('#explorer-predictive-view div.grid-cols-3 uppercase');
+    
+    if (val === '--clustering--') {
+        kContainer.classList.remove('hidden');
+        button.querySelector('span').textContent = "Run KMeans Clustering";
+        labelMetrics[0].textContent = "Silhouette Index";
+        labelMetrics[1].textContent = "K clusters size";
+        labelMetrics[2].textContent = "WCSS Inertia";
+    } else {
+        kContainer.classList.add('hidden');
+        const meta = datasetMetadata || (activeDashboardData ? activeDashboardData.datasetMetadata : null);
+        const colInfo = (meta && meta.columns) ? meta.columns[val] : null;
+        const type = colInfo ? colInfo.inferred_type : 'numeric';
+        
+        if (type === 'numeric') {
+            button.querySelector('span').textContent = "Train Regressor Model";
+            labelMetrics[0].textContent = "R² Accuracy Score";
+            labelMetrics[1].textContent = "Mean Abs Error (MAE)";
+            labelMetrics[2].textContent = "Mean Sq Error (MSE)";
+        } else {
+            button.querySelector('span').textContent = "Train Classifier Model";
+            labelMetrics[0].textContent = "Accuracy Score";
+            labelMetrics[1].textContent = "Weighted F1-Score";
+            labelMetrics[2].textContent = "Precision Score";
+        }
+    }
+}
+
 function populatePredictiveDropdowns() {
     const meta = datasetMetadata || (activeDashboardData ? activeDashboardData.datasetMetadata : null);
     if (!meta || !meta.columns) return;
@@ -1226,13 +1257,19 @@ function populatePredictiveDropdowns() {
     
     Object.entries(meta.columns).forEach(([colName, colInfo]) => {
         const type = colInfo.inferred_type;
-        
-        if (type === 'numeric') {
-            const opt = document.createElement('option');
-            opt.value = colName;
-            opt.textContent = colName;
-            targetSelect.appendChild(opt);
-        }
+        const opt = document.createElement('option');
+        opt.value = colName;
+        opt.textContent = `${colName} (${type})`;
+        targetSelect.appendChild(opt);
+    });
+    
+    const optCluster = document.createElement('option');
+    optCluster.value = '--clustering--';
+    optCluster.textContent = '[Unsupervised KMeans Clustering]';
+    targetSelect.appendChild(optCluster);
+    
+    Object.entries(meta.columns).forEach(([colName, colInfo]) => {
+        const type = colInfo.inferred_type;
         
         const wrapper = document.createElement('label');
         wrapper.className = "flex items-center space-x-2 text-slate-300 py-1 cursor-pointer hover:text-white transition-colors";
@@ -1241,12 +1278,7 @@ function populatePredictiveDropdowns() {
         checkbox.type = "checkbox";
         checkbox.value = colName;
         checkbox.className = "predict-feature-check w-4 h-4 text-indigo-600 bg-slate-955 border-slate-800 rounded focus:ring-indigo-500";
-        
-        const allNumeric = Object.entries(meta.columns).filter(([k,v]) => v.inferred_type === 'numeric').map(([k,v]) => k);
-        const defaultTarget = allNumeric[0];
-        if (colName !== defaultTarget && (type === 'numeric' || type === 'categorical')) {
-            checkbox.checked = true;
-        }
+        checkbox.checked = true;
         
         const labelText = document.createElement('span');
         labelText.textContent = `${colName} (${type})`;
@@ -1255,11 +1287,14 @@ function populatePredictiveDropdowns() {
         wrapper.appendChild(labelText);
         featuresContainer.appendChild(wrapper);
     });
+    
+    togglePredictiveTargetMode(targetSelect.value);
 }
 
 async function trainPredictiveModel() {
     const target = document.getElementById('predict-target-select').value;
     const checkboxes = document.querySelectorAll('.predict-feature-check:checked');
+    const nClusters = document.getElementById('predict-k-select').value;
     
     const predictors = [];
     checkboxes.forEach(cb => {
@@ -1269,7 +1304,7 @@ async function trainPredictiveModel() {
     });
     
     if (!target) {
-        alert("Please select a target column to predict.");
+        alert("Please select a target variable or unsupervised clustering.");
         return;
     }
     
@@ -1278,79 +1313,131 @@ async function trainPredictiveModel() {
         return;
     }
     
-    showSpinner("Training Random Forest predictive model...");
+    showSpinner("Building dynamic machine learning model...");
     
     try {
         const response = await fetch('/api/predictive/train', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target, predictors })
+            body: JSON.stringify({ target, predictors, n_clusters: parseInt(nClusters) })
         });
         
         const result = await response.json();
         hideSpinner();
         
         if (!response.ok) {
-            alert("Training failed: " + (result.error || "Unknown error"));
+            alert("Model build failed: " + (result.error || "Unknown error"));
             return;
         }
         
-        document.getElementById('ml-metric-r2').textContent = result.metrics.r2.toFixed(4);
-        document.getElementById('ml-metric-mae').textContent = result.metrics.mae.toLocaleString(undefined, { maximumFractionDigits: 4 });
-        document.getElementById('ml-metric-mse').textContent = result.metrics.mse.toLocaleString(undefined, { maximumFractionDigits: 4 });
-        
-        const actuals = result.actual_vs_predicted.map(d => d.actual);
-        const predicted = result.actual_vs_predicted.map(d => d.predicted);
-        
-        const minVal = Math.min(...actuals, ...predicted);
-        const maxVal = Math.max(...actuals, ...predicted);
-        
-        const traceScatter = {
-            x: actuals,
-            y: predicted,
-            mode: 'markers',
-            name: 'Data Point Predictions',
-            type: 'scatter',
-            marker: {
-                color: THEMES[currentTheme].primary,
-                size: 8,
-                opacity: 0.7,
-                line: { color: THEMES[currentTheme].primary, width: 1 }
-            }
-        };
-        
-        const traceLine = {
-            x: [minVal, maxVal],
-            y: [minVal, maxVal],
-            mode: 'lines',
-            name: 'Perfect Projection Line (y=x)',
-            type: 'scatter',
-            line: {
-                color: THEMES[currentTheme].secondary || '#ec4899',
-                width: 2,
-                dash: 'dash'
-            }
-        };
-        
-        const plotLayout = {
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            margin: { l: 50, r: 20, t: 20, b: 50 },
-            font: { color: THEMES[currentTheme].text, family: 'Outfit, sans-serif', size: 10 },
-            xaxis: {
-                title: 'Actual Value',
-                gridcolor: THEMES[currentTheme].grid,
-                linecolor: THEMES[currentTheme].grid
-            },
-            yaxis: {
-                title: 'Predicted Value',
-                gridcolor: THEMES[currentTheme].grid,
-                linecolor: THEMES[currentTheme].grid
-            },
-            showlegend: false
-        };
-        
-        Plotly.newPlot('ml-regression-chart', [traceScatter, traceLine], plotLayout, { responsive: true, displayModeBar: false });
+        if (result.mode === 'clustering') {
+            document.getElementById('ml-metric-r2').textContent = "N/A";
+            document.getElementById('ml-metric-mae').textContent = nClusters;
+            document.getElementById('ml-metric-mse').textContent = result.metrics.inertia.toLocaleString(undefined, { maximumFractionDigits: 1 });
+            
+            const clusters = result.chart_data.map(d => d.cluster);
+            const xCoords = result.chart_data.map(d => d.x);
+            const yCoords = result.chart_data.map(d => d.y);
+            
+            const traceClusters = {
+                x: xCoords,
+                y: yCoords,
+                mode: 'markers',
+                type: 'scatter',
+                text: result.chart_data.map(d => `Row: ${d.label} | Cluster: ${d.cluster}`),
+                marker: {
+                    color: clusters,
+                    colorscale: 'Portland',
+                    size: 8,
+                    opacity: 0.85,
+                    showscale: true,
+                    colorbar: { title: 'Cluster ID', thickness: 12 }
+                }
+            };
+            
+            const plotLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                margin: { l: 40, r: 20, t: 20, b: 40 },
+                font: { color: THEMES[currentTheme].text, family: 'Outfit, sans-serif', size: 10 },
+                xaxis: { title: 'PCA component 1', gridcolor: THEMES[currentTheme].grid, linecolor: THEMES[currentTheme].grid },
+                yaxis: { title: 'PCA component 2', gridcolor: THEMES[currentTheme].grid, linecolor: THEMES[currentTheme].grid },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('ml-regression-chart', [traceClusters], plotLayout, { responsive: true, displayModeBar: false });
+        }
+        else if (result.mode === 'classification') {
+            document.getElementById('ml-metric-r2').textContent = result.metrics.accuracy.toFixed(4);
+            document.getElementById('ml-metric-mae').textContent = result.metrics.f1_score.toFixed(4);
+            document.getElementById('ml-metric-mse').textContent = result.metrics.precision.toFixed(4);
+            
+            const cm = result.confusion_matrix;
+            const traceHeatmap = {
+                z: cm.z,
+                x: cm.x,
+                y: cm.y,
+                type: 'heatmap',
+                colorscale: 'Portland',
+                showscale: true
+            };
+            
+            const plotLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                margin: { l: 60, r: 20, t: 20, b: 60 },
+                font: { color: THEMES[currentTheme].text, family: 'Outfit, sans-serif', size: 10 },
+                xaxis: { title: 'Predicted Class', gridcolor: 'rgba(0,0,0,0)', linecolor: THEMES[currentTheme].grid },
+                yaxis: { title: 'Actual Class', gridcolor: 'rgba(0,0,0,0)', linecolor: THEMES[currentTheme].grid }
+            };
+            
+            Plotly.newPlot('ml-regression-chart', [traceHeatmap], plotLayout, { responsive: true, displayModeBar: false });
+        }
+        else {
+            document.getElementById('ml-metric-r2').textContent = result.metrics.r2.toFixed(4);
+            document.getElementById('ml-metric-mae').textContent = result.metrics.mae.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            document.getElementById('ml-metric-mse').textContent = result.metrics.mse.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            
+            const actuals = result.actual_vs_predicted.map(d => d.actual);
+            const predicted = result.actual_vs_predicted.map(d => d.predicted);
+            const minVal = Math.min(...actuals, ...predicted);
+            const maxVal = Math.max(...actuals, ...predicted);
+            
+            const traceScatter = {
+                x: actuals,
+                y: predicted,
+                mode: 'markers',
+                name: 'Predictions',
+                type: 'scatter',
+                marker: {
+                    color: THEMES[currentTheme].primary,
+                    size: 8,
+                    opacity: 0.7,
+                    line: { color: THEMES[currentTheme].primary, width: 1 }
+                }
+            };
+            
+            const traceLine = {
+                x: [minVal, maxVal],
+                y: [minVal, maxVal],
+                mode: 'lines',
+                name: 'y=x line',
+                type: 'scatter',
+                line: { color: THEMES[currentTheme].secondary || '#ec4899', width: 2, dash: 'dash' }
+            };
+            
+            const plotLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                margin: { l: 50, r: 20, t: 20, b: 50 },
+                font: { color: THEMES[currentTheme].text, family: 'Outfit, sans-serif', size: 10 },
+                xaxis: { title: 'Actual Value', gridcolor: THEMES[currentTheme].grid, linecolor: THEMES[currentTheme].grid },
+                yaxis: { title: 'Predicted Value', gridcolor: THEMES[currentTheme].grid, linecolor: THEMES[currentTheme].grid },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('ml-regression-chart', [traceScatter, traceLine], plotLayout, { responsive: true, displayModeBar: false });
+        }
         
         const simulatorInputs = document.getElementById('ml-simulator-inputs');
         simulatorInputs.innerHTML = '';
@@ -1362,7 +1449,7 @@ async function trainPredictiveModel() {
             if (featureMeta.type === 'categorical') {
                 inputWrapper.innerHTML = `
                     <label class="block text-xs text-slate-400 font-semibold">${featureName}</label>
-                    <select class="ml-simulator-val w-full bg-slate-950 border border-slate-850 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none" data-feature="${featureName}">
+                    <select class="ml-simulator-val w-full bg-slate-955 border border-slate-850 text-slate-200 rounded-lg p-2.5 text-xs focus:border-indigo-500 focus:outline-none" data-feature="${featureName}">
                         ${featureMeta.categories.map(cat => `<option value="${cat}" ${cat === featureMeta.default ? 'selected' : ''}>${cat}</option>`).join('')}
                     </select>
                 `;
@@ -1393,6 +1480,19 @@ async function trainPredictiveModel() {
         });
         
         document.getElementById('ml-simulator-container').classList.remove('hidden');
+        
+        const outcomeHeader = document.querySelector('#ml-simulator-container span.text-slate-500');
+        if (result.mode === 'clustering') {
+            outcomeHeader.textContent = "Simulations match features to PCA clusters in real-time.";
+            document.querySelector('#ml-simulator-container div.text-slate-400').textContent = "Projected Cluster Belonging";
+        } else if (result.mode === 'classification') {
+            outcomeHeader.textContent = "Simulations calculate probability distributions on classifier classes.";
+            document.querySelector('#ml-simulator-container div.text-slate-400').textContent = "Projected Category & Confidence";
+        } else {
+            outcomeHeader.textContent = "Simulations are run in real-time on your trained Random Forest regressor.";
+            document.querySelector('#ml-simulator-container div.text-slate-400').textContent = "Projected Output Prediction";
+        }
+        
         runSimulatorInference();
     } catch (e) {
         hideSpinner();

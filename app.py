@@ -727,6 +727,7 @@ def api_predictive_train():
     data = request.json or {}
     target_col = data.get('target')
     predictor_cols = data.get('predictors', [])
+    n_clusters = int(data.get('n_clusters', 3))
     
     if not target_col or not predictor_cols:
         return jsonify({'error': 'Please select both target and predictor columns.'}), 400
@@ -734,22 +735,37 @@ def api_predictive_train():
     try:
         df = pd.read_csv(active_csv_path)
         
-        model_data = analyzer.train_predictive_model(df, target_col, predictor_cols)
+        model_data = analyzer.train_predictive_model(df, target_col, predictor_cols, n_clusters=n_clusters)
         
+        # Cache model state in session
         session_state['active_model'] = {
             'model': model_data['model'],
             'encoders': model_data['encoders'],
             'predictor_meta': model_data['predictor_meta'],
             'target': target_col,
-            'predictors': predictor_cols
+            'predictors': predictor_cols,
+            'mode': model_data['mode'],
+            'target_encoder': model_data.get('target_encoder'),
+            'pca': model_data.get('pca')
         }
         
-        return jsonify({
+        # Prepare response
+        resp = {
+            'mode': model_data['mode'],
             'metrics': model_data['metrics'],
-            'importances': model_data['importances'],
-            'actual_vs_predicted': model_data['actual_vs_predicted'],
             'predictor_meta': model_data['predictor_meta']
-        })
+        }
+        
+        if model_data['mode'] == 'clustering':
+            resp['chart_data'] = model_data['chart_data']
+        elif model_data['mode'] == 'classification':
+            resp['importances'] = model_data['importances']
+            resp['confusion_matrix'] = model_data['confusion_matrix']
+        else: # regression
+            resp['importances'] = model_data['importances']
+            resp['actual_vs_predicted'] = model_data['actual_vs_predicted']
+            
+        return jsonify(resp)
         
     except Exception as e:
         import traceback
@@ -771,11 +787,15 @@ def api_predictive_simulate():
             active_model_state['model'],
             active_model_state['encoders'],
             active_model_state['predictor_meta'],
-            inputs
+            inputs,
+            target_encoder=active_model_state.get('target_encoder'),
+            mode=active_model_state.get('mode'),
+            pca=active_model_state.get('pca')
         )
         return jsonify({
             'prediction': prediction,
-            'target': active_model_state['target']
+            'target': active_model_state['target'],
+            'mode': active_model_state.get('mode')
         })
     except Exception as e:
         return jsonify({'error': f"Simulation failed: {str(e)}"}), 500
