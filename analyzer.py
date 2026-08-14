@@ -898,14 +898,45 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
         if len(subset_df) < 10:
             raise ValueError("Not enough valid data rows (minimum 10 required) after dropping missing cells.")
             
-        X = subset_df.copy()
+        X = pd.DataFrame(index=subset_df.index)
         encoders = {}
         predictor_meta = {}
+        processed_predictors = []
         
-        # Encode categorical columns
         for col in predictor_cols:
-            col_series = X[col]
-            if col_series.dtype == 'object' or col_series.dtype.name == 'category':
+            col_series = subset_df[col]
+            is_date = False
+            col_name_lower = col.lower()
+            if 'date' in col_name_lower or 'time' in col_name_lower or 'year' in col_name_lower:
+                try:
+                    pd.to_datetime(col_series.dropna().head(10), errors='raise')
+                    is_date = True
+                except Exception:
+                    pass
+                    
+            if is_date:
+                parsed = pd.to_datetime(col_series, errors='coerce')
+                mode_val = parsed.mode().iloc[0] if not parsed.mode().empty else pd.Timestamp('2020-01-01')
+                parsed = parsed.fillna(mode_val)
+                X[f"{col}_year"] = parsed.dt.year.astype(float)
+                X[f"{col}_month"] = parsed.dt.month.astype(float)
+                X[f"{col}_day"] = parsed.dt.day.astype(float)
+                X[f"{col}_dayofweek"] = parsed.dt.dayofweek.astype(float)
+                
+                predictor_meta[f"{col}_year"] = {
+                    'type': 'numeric', 'min': float(X[f"{col}_year"].min()), 'max': float(X[f"{col}_year"].max()), 'default': float(X[f"{col}_year"].median())
+                }
+                predictor_meta[f"{col}_month"] = {
+                    'type': 'numeric', 'min': 1.0, 'max': 12.0, 'default': float(X[f"{col}_month"].median())
+                }
+                predictor_meta[f"{col}_day"] = {
+                    'type': 'numeric', 'min': 1.0, 'max': 31.0, 'default': float(X[f"{col}_day"].median())
+                }
+                predictor_meta[f"{col}_dayofweek"] = {
+                    'type': 'numeric', 'min': 0.0, 'max': 6.0, 'default': float(X[f"{col}_dayofweek"].median())
+                }
+                processed_predictors.extend([f"{col}_year", f"{col}_month", f"{col}_day", f"{col}_dayofweek"])
+            elif col_series.dtype == 'object' or col_series.dtype.name == 'category' or col_series.dtype == 'bool' or not pd.api.types.is_numeric_dtype(col_series):
                 le = LabelEncoder()
                 X[col] = le.fit_transform(col_series.astype(str))
                 encoders[col] = le
@@ -914,13 +945,16 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
                     'categories': [str(c) for c in le.classes_],
                     'default': str(col_series.mode().iloc[0]) if not col_series.mode().empty else str(col_series.iloc[0])
                 }
+                processed_predictors.append(col)
             else:
+                X[col] = pd.to_numeric(col_series, errors='coerce').fillna(col_series.median() if not col_series.empty else 0.0).astype(float)
                 predictor_meta[col] = {
                     'type': 'numeric',
-                    'min': float(col_series.min()),
-                    'max': float(col_series.max()),
-                    'default': float(col_series.median())
+                    'min': float(X[col].min()),
+                    'max': float(X[col].max()),
+                    'default': float(X[col].median() if not X[col].empty else 0.0)
                 }
+                processed_predictors.append(col)
                 
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
         clusters = kmeans.fit_predict(X)
@@ -962,15 +996,58 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
     if len(subset_df) < 10:
         raise ValueError("Not enough valid data rows (minimum 10 required) after dropping missing cells.")
         
-    X = subset_df[predictor_cols].copy()
-    y = subset_df[target_col].copy()
-    
+    # Check if target column is a date/time sequence
+    is_target_date = False
+    try:
+        if 'date' in target_col.lower() or 'time' in target_col.lower():
+            pd.to_datetime(subset_df[target_col].dropna().head(10), errors='raise')
+            is_target_date = True
+    except Exception:
+        pass
+        
+    if is_target_date:
+        raise ValueError(f"Target column '{target_col}' contains date/time values, which cannot be predicted directly. Please choose a numeric column or categorical label as your target.")
+
+    # Process X (features)
+    X = pd.DataFrame(index=subset_df.index)
     encoders = {}
     predictor_meta = {}
+    processed_predictors = []
     
     for col in predictor_cols:
-        col_series = X[col]
-        if col_series.dtype == 'object' or col_series.dtype.name == 'category':
+        col_series = subset_df[col]
+        is_date = False
+        col_name_lower = col.lower()
+        if 'date' in col_name_lower or 'time' in col_name_lower or 'year' in col_name_lower:
+            try:
+                pd.to_datetime(col_series.dropna().head(10), errors='raise')
+                is_date = True
+            except Exception:
+                pass
+                
+        if is_date:
+            parsed = pd.to_datetime(col_series, errors='coerce')
+            mode_val = parsed.mode().iloc[0] if not parsed.mode().empty else pd.Timestamp('2020-01-01')
+            parsed = parsed.fillna(mode_val)
+            X[f"{col}_year"] = parsed.dt.year.astype(float)
+            X[f"{col}_month"] = parsed.dt.month.astype(float)
+            X[f"{col}_day"] = parsed.dt.day.astype(float)
+            X[f"{col}_dayofweek"] = parsed.dt.dayofweek.astype(float)
+            
+            predictor_meta[f"{col}_year"] = {
+                'type': 'numeric', 'min': float(X[f"{col}_year"].min()), 'max': float(X[f"{col}_year"].max()), 'default': float(X[f"{col}_year"].median())
+            }
+            predictor_meta[f"{col}_month"] = {
+                'type': 'numeric', 'min': 1.0, 'max': 12.0, 'default': float(X[f"{col}_month"].median())
+            }
+            predictor_meta[f"{col}_day"] = {
+                'type': 'numeric', 'min': 1.0, 'max': 31.0, 'default': float(X[f"{col}_day"].median())
+            }
+            predictor_meta[f"{col}_dayofweek"] = {
+                'type': 'numeric', 'min': 0.0, 'max': 6.0, 'default': float(X[f"{col}_dayofweek"].median())
+            }
+            processed_predictors.extend([f"{col}_year", f"{col}_month", f"{col}_day", f"{col}_dayofweek"])
+        elif col_series.dtype == 'object' or col_series.dtype.name == 'category' or col_series.dtype == 'bool' or not pd.api.types.is_numeric_dtype(col_series):
             le = LabelEncoder()
             X[col] = le.fit_transform(col_series.astype(str))
             encoders[col] = le
@@ -979,24 +1056,27 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
                 'categories': [str(c) for c in le.classes_],
                 'default': str(col_series.mode().iloc[0]) if not col_series.mode().empty else str(col_series.iloc[0])
             }
+            processed_predictors.append(col)
         else:
+            X[col] = pd.to_numeric(col_series, errors='coerce').fillna(col_series.median() if not col_series.empty else 0.0).astype(float)
             predictor_meta[col] = {
                 'type': 'numeric',
-                'min': float(col_series.min()),
-                'max': float(col_series.max()),
-                'default': float(col_series.median())
+                'min': float(X[col].min()),
+                'max': float(X[col].max()),
+                'default': float(X[col].median() if not X[col].empty else 0.0)
             }
-            
+            processed_predictors.append(col)
+
+    y = subset_df[target_col].copy()
     is_classification = False
     target_encoder = None
     
-    # Classification check: non-numeric target OR categorical classes
-    if y.dtype == 'object' or y.dtype.name == 'category' or y.dtype == 'bool' or len(y.unique()) < 5:
+    if y.dtype == 'object' or y.dtype.name == 'category' or y.dtype == 'bool' or not pd.api.types.is_numeric_dtype(y) or len(y.unique()) < 5:
         is_classification = True
         target_encoder = LabelEncoder()
         y_encoded = target_encoder.fit_transform(y.astype(str))
     else:
-        y_encoded = y.astype(float)
+        y_encoded = pd.to_numeric(y, errors='coerce').fillna(y.median() if not y.empty else 0.0).astype(float)
         
     X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
     
@@ -1019,7 +1099,7 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
         
         importances_raw = model.feature_importances_
         importances = []
-        for col, imp in zip(predictor_cols, importances_raw):
+        for col, imp in zip(X.columns, importances_raw):
             importances.append({'feature': col, 'importance': float(imp)})
         importances.sort(key=lambda x: x['importance'], reverse=True)
         
@@ -1048,7 +1128,7 @@ def train_predictive_model(df, target_col, predictor_cols, n_clusters=3):
         
         importances_raw = model.feature_importances_
         importances = []
-        for col, imp in zip(predictor_cols, importances_raw):
+        for col, imp in zip(X.columns, importances_raw):
             importances.append({'feature': col, 'importance': float(imp)})
         importances.sort(key=lambda x: x['importance'], reverse=True)
         
