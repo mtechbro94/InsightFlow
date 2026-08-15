@@ -1169,6 +1169,104 @@ def api_predictive_simulate():
     except Exception as e:
         return jsonify({'error': f"Simulation failed: {str(e)}"}), 500
 
+@app.route('/api/predictive/prescribe', methods=['POST'])
+def api_predictive_prescribe():
+    """Generates prescriptive AI advisory suggestions to optimize a target variable using Grok."""
+    data = request.json or {}
+    target = data.get('target')
+    goal = data.get('goal', 'maximize')
+    importances = data.get('importances', {})
+    summary_stats = data.get('summary_stats', {})
+    
+    if not target:
+        return jsonify({'error': 'Target variable is required for prescriptive optimization.'}), 400
+
+    # Sort importances descending to find the top drivers
+    sorted_drivers = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+    top_drivers_list = [f"{k} ({v:.1%})" for k, v in sorted_drivers[:3]]
+    top_drivers_str = ", ".join(top_drivers_list) if top_drivers_list else "none detected"
+
+    system_prompt = (
+        "You are an expert Prescriptive Business Intelligence Analyst for the 'InsightFlow' analytics suite.\n"
+        "Your task is to write a detailed, highly professional prescriptive advisory report helping the user optimize a target variable.\n"
+        "Structure your response beautifully with markdown headings, clear bold action items, and numeric lists.\n"
+    )
+    
+    user_prompt = (
+        f"Target Variable to Optimize: '{target}'\n"
+        f"Desired Goal: {goal.upper()} the target variable.\n"
+        f"Key predictors influencing this target and their relative feature weights: {json.dumps(importances)}\n"
+        f"Average feature values/summary statistics: {json.dumps(summary_stats)}\n\n"
+        "Provide a prescriptive advisory containing:\n"
+        "1. Feasibility Assessment (Is it easy or hard to adjust these variables to achieve the goal? Why?)\n"
+        "2. Actionable Prescriptive Recommendations (3 to 4 concrete business suggestions based on model weights to drive optimization)\n"
+        "3. Rationale & Expected Business Impact for each suggestion\n"
+        "4. Side-effects, risks, or indicators to monitor closely.\n\n"
+        "Be concise, highly professional, business-focused, and write directly to the boardroom."
+    )
+
+    grok_api_key = os.getenv('GROK_API_KEY') or os.getenv('XAI_API_KEY')
+    
+    if grok_api_key:
+        try:
+            import requests
+            headers = {
+                "Authorization": f"Bearer {grok_api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "grok-2-latest",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.3
+            }
+            url = "https://api.xai.com/v1/chat/completions"
+            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            
+            if response.status_code == 200:
+                result_json = response.json()
+                advisory_text = result_json['choices'][0]['message']['content']
+                return jsonify({
+                    'advisory': advisory_text,
+                    'mode': 'grok'
+                })
+        except Exception as e:
+            # Silently log and fall back to local rule-based suggestions
+            print(f"Grok prescriptive call failed: {str(e)}")
+
+    # Heuristic Local Fallback
+    top_feature = sorted_drivers[0][0] if len(sorted_drivers) > 0 else "N/A"
+    top_val = sorted_drivers[0][1] if len(sorted_drivers) > 0 else 0.0
+    second_feature = sorted_drivers[1][0] if len(sorted_drivers) > 1 else "N/A"
+    second_val = sorted_drivers[1][1] if len(sorted_drivers) > 1 else 0.0
+
+    fallback_text = (
+        f"### 🎯 Prescriptive Advisory Report for {target} ({goal.title()} Goal)\n\n"
+        f"**Feasibility Assessment:** **HIGH**\n"
+        f"The trained predictive model has isolated strong drivers representing a significant impact on '{target}'. "
+        f"The primary driver of the model is **{top_feature}** which controls **{top_val:.1%}** of the predictive influence. "
+        f"By focusing budget adjustments and operational strategies on these high-leverage columns, the organization can successfully "
+        f"steer the target metric.\n\n"
+        f"#### 📋 Tactical Action Items:\n"
+        f"1. **Prioritize Adjustment of '{top_feature}'**\n"
+        f"   - *Action Plan:* Since this is your primary driver ({top_val:.1%} weight), implement changes of +/- 10% to test immediate feedback on '{target}'.\n"
+        f"   - *Rationale:* Small optimizations here will produce the largest statistical change in the target variable.\n\n"
+        f"2. **Stabilize and Monitor '{second_feature}'**\n"
+        f"   - *Action Plan:* This column represents the secondary contributor with **{second_val:.1%}** influence. Ensure this attribute is kept within standard operational bounds to prevent unexpected drops.\n"
+        f"   - *Rationale:* Safeguards the predictive stability of your optimization strategy.\n\n"
+        f"3. **Minimize Resource Allocation on Weak Predictors**\n"
+        f"   - *Action Plan:* Avoid spending significant budget or operational focus adjusting lower-tier attributes as they have minor statistical impact.\n\n"
+        f"**⚠️ Key Operational Risks to Monitor:**\n"
+        f"- Ensure that adjustments to '{top_feature}' do not induce multicollinearity or negative cross-reactions with other features. Monitor secondary metrics weekly."
+    )
+
+    return jsonify({
+        'advisory': fallback_text,
+        'mode': 'fallback'
+    })
+
 @app.route('/api/alerts/rules', methods=['GET', 'POST'])
 def api_alerts_rules():
     """Gets or sets automated alert threshold rules."""

@@ -3,6 +3,7 @@ let datasetMetadata = null;
 let currentCleanLogs = [];
 let datasetProfile = null;
 let activeDashboardData = null;
+let lastTrainedModelInfo = null;
 
 // Dashboard Themes configurations
 let currentTheme = 'cyberpunk';
@@ -1232,6 +1233,68 @@ async function unloadActiveDataset() {
     }
 }
 
+async function generatePrescriptionAdvisory() {
+    if (!lastTrainedModelInfo) {
+        alert("Please train a regression or classification model first.");
+        return;
+    }
+    
+    const goal = document.getElementById('prescriptive-goal-select').value;
+    const outputDiv = document.getElementById('prescriptive-output');
+    
+    outputDiv.innerHTML = `
+        <div class="flex items-center justify-center space-x-2 py-6 text-slate-400">
+            <svg class="animate-spin h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-xs font-mono">Grok model optimizing target parameters...</span>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/predictive/prescribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                target: lastTrainedModelInfo.target,
+                goal: goal,
+                importances: lastTrainedModelInfo.importances,
+                summary_stats: lastTrainedModelInfo.summary_stats
+            })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            outputDiv.innerHTML = `<div class="text-rose-500 text-center py-4">Optimization failed: ${result.error || 'Unknown error'}</div>`;
+            return;
+        }
+        
+        let html = result.advisory;
+        // Simple markdown parser
+        html = html.replace(/### (.*?)\n/g, '<h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2 mt-4">$1</h4>');
+        html = html.replace(/#### (.*?)\n/g, '<h5 class="text-xs font-bold text-white mb-2 mt-3">$1</h5>');
+        html = html.replace(/\*\*Feasibility Assessment:\*\* (.*?)\n/g, '<div class="mb-4 text-xs"><strong>Feasibility Assessment:</strong> <span class="px-2 py-0.5 rounded bg-emerald-400/10 text-emerald-400 font-bold">$1</span></div>');
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-200">$1</strong>');
+        html = html.replace(/\*(.*?)\*/g, '<em class="text-slate-400">$1</em>');
+        html = html.replace(/▪ (.*?)\n/g, '<li class="ml-4 list-disc text-slate-300 py-1">$1</li>');
+        html = html.replace(/- (.*?)\n/g, '<li class="ml-4 list-disc text-slate-300 py-1">$1</li>');
+        html = html.replace(/\n\n/g, '<br/>');
+        
+        outputDiv.innerHTML = `
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-[10px] text-slate-500 border-b border-slate-900 pb-2 mb-2">
+                    <span>Engine: ${result.mode === 'grok' ? 'Grok-2 Cognitive Engine' : 'Deterministic Rule Fallback'}</span>
+                    <span class="text-emerald-400">● Optimization Active</span>
+                </div>
+                <div class="text-xs leading-relaxed text-slate-300">${html}</div>
+            </div>
+        `;
+    } catch (err) {
+        outputDiv.innerHTML = `<div class="text-rose-500 text-center py-4">Error: ${err.message}</div>`;
+    }
+}
+
 async function loadHistoryItem(historyId) {
     showSpinner("Restoring analysis history session...");
     
@@ -1723,6 +1786,25 @@ async function trainPredictiveModel() {
         } else {
             outcomeHeader.textContent = "Simulations are run in real-time on your trained Random Forest regressor.";
             document.querySelector('#ml-simulator-container div.text-slate-400').textContent = "Projected Output Prediction";
+        }
+        
+        if (result.mode !== 'clustering') {
+            lastTrainedModelInfo = {
+                target: target,
+                mode: result.mode,
+                importances: result.importances,
+                summary_stats: {}
+            };
+            Object.entries(result.predictor_meta).forEach(([k, v]) => {
+                lastTrainedModelInfo.summary_stats[k] = v.default;
+            });
+            document.getElementById('ml-prescriptive-container').classList.remove('hidden');
+            document.getElementById('prescriptive-output').innerHTML = `
+                <div class="text-slate-500 text-center py-4">Click "Generate Advisory" to compile AI Optimization Guidelines for ${target}.</div>
+            `;
+        } else {
+            lastTrainedModelInfo = null;
+            document.getElementById('ml-prescriptive-container').classList.add('hidden');
         }
         
         runSimulatorInference();
