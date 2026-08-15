@@ -218,47 +218,60 @@
                     <button onclick="openAuthModal('register')" class="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-white text-sm rounded-xl shadow-xl shadow-indigo-600/25 transition-all">Create Free Account</button>
                     <button onclick="scrollToSection('marketing-features')" class="px-6 py-3.5 bg-slate-900 hover:bg-slate-850 font-bold text-slate-300 text-sm rounded-xl border border-slate-800 transition-all">Explore Features</button>
                 </div>
+                
+                <!-- Hero Preview Mockup (Designed by Human) -->
+                <div class="mt-12 relative max-w-5xl mx-auto rounded-3xl overflow-hidden border border-slate-800/80 bg-slate-950/40 p-2.5 shadow-2xl transition-transform hover:scale-[1.005]">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-3xl blur-2xl opacity-10 -z-10"></div>
+                    <img src="/static/images/hero_mockup.jpg" alt="InsightFlow Dashboard Mockup" class="w-full h-auto rounded-2xl border border-slate-900/60 object-cover select-none">
+                </div>
             </div>
 
             <!-- Features Showcase Section -->
-            <section id="marketing-features" class="space-y-12">
+            <section id="marketing-features" class="space-y-24">
                 <div class="text-center space-y-3">
                     <h2 class="text-3xl font-black tracking-tight text-white">Full-Stack Analytics Pipeline</h2>
                     <p class="text-sm text-slate-400 max-w-xl mx-auto">Everything you need to transform messy data sheets into boardroom-ready intelligence.</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <!-- Feature 1 -->
-                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
+                <!-- Feature 1: AI Copilot -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-6">
                         <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         </div>
-                        <h3 class="text-lg font-bold text-white">Interactive Copilot Chat</h3>
-                        <p class="text-xs text-slate-400 leading-relaxed">
-                            Ask complex questions to our agentic AI analyst. Drill down, query trends, request calculations, and review Plotly visualizations inside a live chat thread.
+                        <h3 class="text-2xl font-black text-white">Interactive AI Copilot Chat</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            Converse with our advanced agentic AI analyst to drill down into outliers, identify standard deviations, and generate regression models. The copilot responds with live equations, data frame matrices, and dynamic, interactive Plotly visualization charts inside the chat interface.
                         </p>
+                        <ul class="space-y-3 text-xs text-slate-400">
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Ask questions in plain, natural language</li>
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Instant mathematical computation & stats profiles</li>
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Directly download resulting charts as PNG/HTML</li>
+                        </ul>
                     </div>
-
-                    <!-- Feature 2 -->
-                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
-                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z"></path></svg>
-                        </div>
-                        <h3 class="text-lg font-bold text-white">Multi-Mode ML Sandbox</h3>
-                        <p class="text-xs text-slate-400 leading-relaxed">
-                            Train regression, classification, or KMeans clustering models. Evaluate metrics dynamically, display confusion matrix heatmaps, and test future outcome simulations via sliders.
-                        </p>
+                    <div class="relative bg-slate-900/30 border border-slate-850 p-4 rounded-3xl overflow-hidden shadow-xl">
+                        <img src="/static/images/copilot_feature.jpg" alt="AI Copilot Preview" class="w-full h-auto rounded-2xl border border-slate-900/60 object-cover shadow-2xl">
                     </div>
+                </div>
 
-                    <!-- Feature 3 -->
-                    <div class="bg-slate-900/40 border border-slate-900 p-8 rounded-2xl space-y-4">
+                <!-- Feature 2: PDF White-Labeling -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div class="lg:order-2 space-y-6">
                         <div class="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         </div>
-                        <h3 class="text-lg font-bold text-white">White-Label PDF Reports</h3>
-                        <p class="text-xs text-slate-400 leading-relaxed">
-                            Export PDF summaries of your data audits. Upload brand logos, customize corporate hex code headers, select pages, and generate boardroom-ready downloads instantly.
+                        <h3 class="text-2xl font-black text-white">White-Label PDF Report Designer</h3>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            Generate gorgeous, corporate PDF executive summaries with a single click. Our visual designer allows you to customize colors, choose which analysis tables and graphs to export, upload corporate brand logos, and edit custom summaries to share with stakeholders.
                         </p>
+                        <ul class="space-y-3 text-xs text-slate-400">
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Customize header color accents and text</li>
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Dynamic page range and components selection</li>
+                            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Brand white-labeling with custom company logos</li>
+                        </ul>
+                    </div>
+                    <div class="lg:order-1 relative bg-slate-900/30 border border-slate-850 p-4 rounded-3xl overflow-hidden shadow-xl">
+                        <img src="/static/images/reports_feature.jpg" alt="White-Label PDF Reports" class="w-full h-auto rounded-2xl border border-slate-900/60 object-cover shadow-2xl">
                     </div>
                 </div>
             </section>
