@@ -1181,8 +1181,17 @@ def api_predictive_prescribe():
     if not target:
         return jsonify({'error': 'Target variable is required for prescriptive optimization.'}), 400
 
+    # Robust parsing of importances (handles both dict and list-of-dict structures)
+    importances_dict = {}
+    if isinstance(importances, list):
+        for item in importances:
+            if isinstance(item, dict) and 'feature' in item and 'importance' in item:
+                importances_dict[item['feature']] = item['importance']
+    elif isinstance(importances, dict):
+        importances_dict = importances
+
     # Sort importances descending to find the top drivers
-    sorted_drivers = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+    sorted_drivers = sorted(importances_dict.items(), key=lambda x: x[1], reverse=True)
     top_drivers_list = [f"{k} ({v:.1%})" for k, v in sorted_drivers[:3]]
     top_drivers_str = ", ".join(top_drivers_list) if top_drivers_list else "none detected"
 
