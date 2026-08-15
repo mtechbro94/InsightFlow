@@ -219,6 +219,85 @@ def api_upload():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
+@app.route('/api/data/google-sheet', methods=['POST'])
+def api_google_sheet():
+    """Fetches a Google Sheet URL, exports it to CSV, and profiles it."""
+    import re
+    import requests
+    
+    data = request.json or {}
+    sheet_url = data.get('sheet_url', '').strip()
+    
+    if not sheet_url:
+        return jsonify({'error': 'Please provide a valid Google Sheet URL.'}), 400
+        
+    try:
+        # Regex to find the Spreadsheet ID
+        match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', sheet_url)
+        if not match:
+            return jsonify({'error': 'Could not extract Google Spreadsheet ID from the URL. Please make sure it is a valid Google Sheets link.'}), 400
+            
+        spreadsheet_id = match.group(1)
+        
+        # Regex to find gid (optional sheet index)
+        gid_match = re.search(r'[#&]gid=([0-9]+)', sheet_url)
+        gid = gid_match.group(1) if gid_match else '0'
+        
+        export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
+        
+        # Request the CSV
+        response = requests.get(export_url, timeout=10)
+        if response.status_code != 200:
+            return jsonify({'error': f'Failed to retrieve sheet data (HTTP {response.status_code}). Ensure that your Google Sheet has sharing settings set to "Anyone with the link can view".'}), 400
+            
+        # Verify content type has csv/text/tsv or is tabular
+        content_type = response.headers.get('content-type', '').lower()
+        if 'html' in content_type:
+            # Often Google redirects to a login HTML page if the sheet is private
+            return jsonify({'error': 'Access denied by Google. Please make sure your Google Sheet sharing setting is set to "Anyone with the link can view".'}), 400
+            
+        # Write to local file
+        filename = f"google_sheet_{spreadsheet_id[:8]}.csv"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
+            
+        # Convert/standardize via analyzer (also profiles formatting)
+        standard_csv_path, df = analyzer.convert_to_csv(filepath, filename)
+        
+        # Profile dataset
+        profile = analyzer.profile_dataset(df)
+        
+        # Save to session state
+        session_state['original_filepath'] = filepath
+        session_state['converted_csv_path'] = standard_csv_path
+        session_state['filename'] = f"Google Sheet ({filename})"
+        session_state['profile'] = profile
+        
+        # Reset downstream session data
+        session_state['cleaned_csv_path'] = None
+        session_state['cleaned_profile'] = None
+        session_state['cleaning_log'] = []
+        session_state['outliers'] = {}
+        session_state['kpis'] = []
+        session_state['insights'] = {}
+        session_state['eda_results'] = {}
+        
+        return jsonify({
+            'message': 'Google Sheet fetched and profiled successfully.',
+            'filename': f"Google Sheet ({filename})",
+            'num_records': profile['num_records'],
+            'num_features': profile['num_features'],
+            'total_missing': profile['total_missing'],
+            'duplicate_count': profile['duplicate_count'],
+            'memory_usage': profile['memory_usage'],
+            'columns': profile['columns']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to connect Google Sheet: {str(e)}'}), 500
+
 @app.route('/api/clean', methods=['POST'])
 def api_clean():
     """Perives user cleaning options, performs cleaning, returns logs and new stats."""

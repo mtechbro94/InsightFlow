@@ -120,6 +120,58 @@ async function handleFileUpload(file) {
     }
 }
 
+async function connectGoogleSheet() {
+    const urlInput = document.getElementById('google-sheet-url');
+    const sheetUrl = urlInput.value.trim();
+
+    if (!sheetUrl) {
+        alert("Please paste a valid Google Sheet URL first.");
+        return;
+    }
+
+    const uploader = document.getElementById('step-upload');
+    const loading = document.getElementById('upload-loading');
+    
+    // Toggle loading UI
+    loading.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/api/data/google-sheet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sheet_url: sheetUrl })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            alert("Connection failed: " + (result.error || "Unknown error"));
+            loading.classList.add('hidden');
+            return;
+        }
+
+        // Store state
+        datasetMetadata = result;
+        
+        // Setup Step 2 UI
+        document.getElementById('clean-filename').textContent = result.filename;
+        document.getElementById('profile-rows').textContent = result.num_records.toLocaleString();
+        document.getElementById('profile-cols').textContent = result.num_features;
+        document.getElementById('profile-dups').textContent = result.duplicate_count.toLocaleString();
+        
+        // Build Inferred columns cards
+        buildColumnsProfileGrid(result.columns);
+        
+        // Transition Sections
+        uploader.classList.add('hidden');
+        document.getElementById('step-cleaning').classList.remove('hidden');
+        
+    } catch (e) {
+        alert("Server communication error: " + e.message);
+        loading.classList.add('hidden');
+    }
+}
+
 // Render column profiles inside cards
 function buildColumnsProfileGrid(columns) {
     const grid = document.getElementById('columns-profile-grid');
