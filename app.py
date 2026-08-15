@@ -941,6 +941,95 @@ def api_load_history(history_id):
     except Exception as e:
         return jsonify({'error': f"Failed to load history session: {str(e)}"}), 500
 
+@app.route('/api/data/unload', methods=['POST'])
+def api_data_unload():
+    """Unloads the active dataset, clearing session states and deleting temp cache CSVs."""
+    try:
+        # Delete active CSV files if they are in the uploads folder
+        for key in ['original_filepath', 'converted_csv_path', 'cleaned_csv_path']:
+            path = session_state.get(key)
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+                    
+        # Reset session values
+        session_state['original_filepath'] = None
+        session_state['converted_csv_path'] = None
+        session_state['cleaned_csv_path'] = None
+        session_state['filename'] = None
+        session_state['profile'] = None
+        session_state['cleaned_profile'] = None
+        session_state['cleaning_log'] = []
+        session_state['outliers'] = {}
+        session_state['kpis'] = []
+        session_state['insights'] = {}
+        session_state['eda_results'] = {}
+        session_state['active_model'] = None
+        
+        return jsonify({'message': 'Active dataset successfully unloaded and cached files deleted.'})
+    except Exception as e:
+        return jsonify({'error': f"Failed to unload dataset: {str(e)}"}), 500
+
+@app.route('/api/history/delete/<project_id>', methods=['DELETE'])
+def api_history_delete(project_id):
+    """Deletes a saved workspace project from DB/history and removes associated server CSVs."""
+    user_id = session.get('user_id')
+    
+    # 1. Database Deletion (If authenticated)
+    if user_id:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            
+            # Retrieve file paths to delete them from disk
+            c.execute('SELECT converted_csv_path, cleaned_csv_path FROM projects WHERE id = ? AND user_id = ?', (project_id, user_id))
+            row = c.fetchone()
+            
+            if row:
+                for path in row:
+                    if path and os.path.exists(path):
+                        try:
+                            os.remove(path)
+                        except Exception:
+                            pass
+                
+                # Delete project row
+                c.execute('DELETE FROM projects WHERE id = ? AND user_id = ?', (project_id, user_id))
+                conn.commit()
+                conn.close()
+                return jsonify({'message': 'Project database records and server cache files deleted successfully.'})
+            else:
+                conn.close()
+                return jsonify({'error': 'Project not found or access denied.'}), 404
+        except Exception as e:
+            return jsonify({'error': f"Database delete failed: {str(e)}"}), 500
+            
+    # 2. Local fallback JSON deletion (For anonymous guest history)
+    else:
+        try:
+            history_path = os.path.join(app.config['HISTORY_FOLDER'], f"{project_id}.json")
+            if os.path.exists(history_path):
+                # Read path references inside JSON to delete them
+                with open(history_path, 'r') as f:
+                    data = json.load(f)
+                    
+                for path_key in ['converted_csv_path', 'cleaned_csv_path']:
+                    path = data.get(path_key)
+                    if path and os.path.exists(path):
+                        try:
+                            os.remove(path)
+                        except Exception:
+                            pass
+                            
+                os.remove(history_path)
+                return jsonify({'message': 'Local guest project and cache files deleted.'})
+            else:
+                return jsonify({'error': 'Project not found.'}), 404
+        except Exception as e:
+            return jsonify({'error': f"Guest project delete failed: {str(e)}"}), 500
+
 @app.route('/api/pivot', methods=['POST'])
 def api_pivot():
     """Calculates pandas pivot table grouping dynamically."""

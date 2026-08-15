@@ -1149,15 +1149,86 @@ async function loadHistoryList() {
                         <p class="text-[10px] text-slate-500 mt-0.5">${item.record_count.toLocaleString()} rows • ${item.timestamp}</p>
                     </div>
                 </div>
-                <div class="text-xs text-indigo-400 font-semibold flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>Load Dashboard</span>
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                <div class="flex items-center space-x-4">
+                    <div class="text-xs text-indigo-400 font-semibold flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span>Load Dashboard</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                    <button onclick="deleteHistoryProject('${item.id}', event)" class="p-2 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" title="Delete dataset & free disk space">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
                 </div>
             `;
             container.appendChild(card);
         });
     } catch (err) {
         console.warn("Failed to load history items: " + err.message);
+    }
+}
+
+async function deleteHistoryProject(projectId, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    if (!confirm("Are you sure you want to permanently delete this project? This will erase all database references and clear the dataset cache CSV files off the server.")) {
+        return;
+    }
+    
+    showSpinner("Deleting project and freeing disk cache...");
+    try {
+        const response = await fetch(`/api/history/delete/${projectId}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Delete failed: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        loadHistoryList();
+    } catch (err) {
+        hideSpinner();
+        alert("Error deleting project: " + err.message);
+    }
+}
+
+async function unloadActiveDataset() {
+    if (!confirm("Are you sure you want to unload the current dataset? This will clear the active workspace and delete temporary cache files.")) {
+        return;
+    }
+    
+    showSpinner("Unloading active workspace...");
+    try {
+        const response = await fetch('/api/data/unload', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!response.ok) {
+            alert("Unload failed: " + (result.error || "Unknown error"));
+            return;
+        }
+        
+        activeDashboardData = null;
+        activePlotlyCharts = null;
+        datasetMetadata = null;
+        datasetProfile = null;
+        cleaningLog = [];
+        
+        document.getElementById('step-cleaning').classList.add('hidden');
+        document.getElementById('step-logs').classList.add('hidden');
+        document.getElementById('step-dashboard').classList.add('hidden');
+        document.getElementById('step-upload').classList.remove('hidden');
+        
+        loadHistoryList();
+        evaluateAlertRules();
+    } catch (err) {
+        hideSpinner();
+        alert("Error unloading workspace: " + err.message);
     }
 }
 
