@@ -806,6 +806,7 @@ def api_export_custom_pdf():
     accent_color = data.get('accent_color', '#4f46e5')
     include_sections = data.get('include_sections', ['kpis', 'quality', 'insights', 'charts', 'recommendations'])
     logo_path = data.get('logo_path', None)
+    custom_notes = data.get('custom_notes', {})
 
     try:
         df = pd.read_csv(active_csv_path)
@@ -840,7 +841,8 @@ def api_export_custom_pdf():
             company=company,
             accent_color=accent_color,
             include_sections=include_sections,
-            logo_path=logo_path
+            logo_path=logo_path,
+            custom_notes=custom_notes
         )
         
         return jsonify({

@@ -1038,70 +1038,130 @@
         }, false);
     </script>
 
-    <!-- PDF DESIGNER MODAL (Option D) -->
+    <!-- PDF DESIGNER MODAL (Option D / Visual Report Builder) -->
     <div id="pdf-designer-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <!-- Modal Header -->
             <div class="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div>
                     <h3 class="text-lg font-bold text-white flex items-center">
                         <svg class="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Custom PDF Report Designer
+                        Visual PDF Report Builder
                     </h3>
-                    <p class="text-xs text-slate-400 mt-1">Customize report layouts, titles, brand colors, and logo assets.</p>
+                    <p class="text-xs text-slate-400 mt-1">Configure layout pages, toggle report sections, and insert custom page commentary summaries.</p>
                 </div>
                 <button onclick="closePdfDesigner()" class="p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             
-            <!-- Modal Content (Form scroll) -->
-            <div class="p-6 overflow-y-auto space-y-4 text-sm">
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Report Document Title</label>
-                    <input type="text" id="pdf-custom-title" value="Executive Analysis Report" class="w-full bg-slate-950 text-slate-200 text-xs px-3.5 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Organization / Author Name</label>
-                    <input type="text" id="pdf-custom-company" value="InsightFlow" class="w-full bg-slate-950 text-slate-200 text-xs px-3.5 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1.5 font-semibold">Accent Color Palette</label>
-                    <div class="flex items-center space-x-3">
-                        <input type="color" id="pdf-custom-color" value="#4f46e5" class="w-8 h-8 rounded border border-slate-800 bg-transparent cursor-pointer">
-                        <span class="text-xs text-slate-500">Pick brand primary highlighting hex code</span>
+            <!-- Split Grid Builder Content -->
+            <div class="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+                <!-- Left Column: Settings & Text Commentary Forms -->
+                <div class="p-6 overflow-y-auto space-y-4 text-sm border-r border-slate-800/80">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Report Document Details</h4>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1 font-semibold">Report Document Title</label>
+                            <input type="text" id="pdf-custom-title" value="Executive Analysis Report" class="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1 font-semibold">Organization / Author Name</label>
+                            <input type="text" id="pdf-custom-company" value="InsightFlow" class="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-800 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1 font-semibold">Accent Color Palette</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="color" id="pdf-custom-color" value="#4f46e5" class="w-8 h-8 rounded border border-slate-800 bg-transparent cursor-pointer">
+                                <span class="text-[10px] text-slate-500">Pick highlight hex</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1 font-semibold">Brand Logo Image</label>
+                            <input type="file" id="pdf-custom-logo" accept="image/*" class="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-slate-850 file:text-indigo-400 hover:file:bg-slate-800 cursor-pointer">
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-slate-850 pt-4 space-y-4">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Pages Layout & Custom Notes</h4>
+                        
+                        <!-- Cover Page Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-200">Page 1: Cover & Exec Summary</span>
+                                <span class="text-[10px] text-emerald-400 font-bold uppercase">Always Included</span>
+                            </div>
+                            <textarea id="pdf-notes-summary" placeholder="Write custom summary/introduction details to show on the cover page..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
+                        
+                        <!-- KPIs Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center space-x-2 text-xs font-bold text-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="pdf-sec-kpis" checked onchange="updatePdfMockupFlow()" class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
+                                    <span>Page 2: Key Metrics & KPIs</span>
+                                </label>
+                            </div>
+                            <textarea id="pdf-notes-kpis" placeholder="Add custom analytical footnotes or highlight specific targets inside the KPI section..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
+                        
+                        <!-- Quality Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center space-x-2 text-xs font-bold text-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="pdf-sec-quality" checked onchange="updatePdfMockupFlow()" class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
+                                    <span>Page 3: Data Quality & Cleaning Logs</span>
+                                </label>
+                            </div>
+                            <textarea id="pdf-notes-quality" placeholder="Add details explaining dataset anomalies, noise imputation strategies, or outlier ranges..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
+                        
+                        <!-- Insights Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center space-x-2 text-xs font-bold text-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="pdf-sec-insights" checked onchange="updatePdfMockupFlow()" class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
+                                    <span>Page 4: Deep Insights Deck</span>
+                                </label>
+                            </div>
+                            <textarea id="pdf-notes-insights" placeholder="Add strategic highlights or contextual commentary to support the automated insights findings..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
+                        
+                        <!-- Charts Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center space-x-2 text-xs font-bold text-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="pdf-sec-charts" checked onchange="updatePdfMockupFlow()" class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
+                                    <span>Page 5: Static Exploratory Charts</span>
+                                </label>
+                            </div>
+                            <textarea id="pdf-notes-charts" placeholder="Add visual explanations, chart observations, or point out correlation trends..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
+                        
+                        <!-- Recommendations Notes -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center space-x-2 text-xs font-bold text-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="pdf-sec-recs" checked onchange="updatePdfMockupFlow()" class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
+                                    <span>Page 6: Strategic Action Plans</span>
+                                </label>
+                            </div>
+                            <textarea id="pdf-notes-recommendations" placeholder="Draft concrete, human-directed recommendations for stakeholders and executive users..." class="w-full h-16 bg-slate-955 text-slate-300 text-xs p-2 rounded-lg border border-slate-850 focus:outline-none focus:border-indigo-500 placeholder-slate-700 font-sans resize-none"></textarea>
+                        </div>
                     </div>
                 </div>
                 
-                <div>
-                    <label class="block text-xs text-slate-400 mb-2 font-semibold">Document Branding Logo</label>
-                    <input type="file" id="pdf-custom-logo" accept="image/*" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-850 file:text-indigo-400 hover:file:bg-slate-800 cursor-pointer">
-                    <span class="text-[10px] text-slate-500 block mt-1">Recommended transparent .png or .jpg image</span>
-                </div>
-                
-                <div class="border-t border-slate-850 pt-4">
-                    <label class="block text-xs text-slate-400 mb-2 font-semibold">Report Sections to Include</label>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <label class="flex items-center space-x-2 text-slate-300">
-                            <input type="checkbox" id="pdf-sec-kpis" checked class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
-                            <span>Key Metrics & KPIs</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-slate-300">
-                            <input type="checkbox" id="pdf-sec-quality" checked class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
-                            <span>Data Quality Audits</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-slate-300">
-                            <input type="checkbox" id="pdf-sec-insights" checked class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
-                            <span>Deep Insights Deck</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-slate-300">
-                            <input type="checkbox" id="pdf-sec-charts" checked class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
-                            <span>Static Exploratory Charts</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-slate-300">
-                            <input type="checkbox" id="pdf-sec-recs" checked class="w-4 h-4 text-indigo-600 bg-slate-955 border-slate-850 rounded focus:ring-indigo-500">
-                            <span>Strategic Action Plans</span>
-                        </label>
+                <!-- Right Column: Live Interactive Mockup Page Stack Preview -->
+                <div class="p-6 bg-slate-950/40 overflow-y-auto space-y-4 flex flex-col">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Live Page Flow Preview</h4>
+                    <p class="text-[10px] text-slate-500 leading-normal">This live grid shows the active sequence of pages that will be rendered inside your final PDF report.</p>
+                    
+                    <div id="pdf-mockup-flow-container" class="grid grid-cols-2 gap-4 flex-1">
+                        <!-- Populated dynamically via JS -->
                     </div>
                 </div>
             </div>

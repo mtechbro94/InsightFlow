@@ -995,10 +995,48 @@ function openPdfDesigner() {
     if (THEMES[currentTheme]) {
         document.getElementById('pdf-custom-color').value = THEMES[currentTheme].primary;
     }
+    updatePdfMockupFlow();
 }
 
 function closePdfDesigner() {
     document.getElementById('pdf-designer-modal').classList.add('hidden');
+}
+
+function updatePdfMockupFlow() {
+    const container = document.getElementById('pdf-mockup-flow-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    let pageCount = 1;
+    
+    const addMockupPageCard = (title, num) => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex flex-col justify-between items-center text-center h-28 relative shadow-lg';
+        div.innerHTML = `
+            <div class="absolute top-2 left-3 text-[10px] font-mono text-slate-500 font-bold">Page ${num}</div>
+            <div class="flex-1 flex items-center justify-center text-slate-200 font-semibold text-xs py-2">${title}</div>
+            <span class="text-[9px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">Active</span>
+        `;
+        container.appendChild(div);
+    };
+
+    addMockupPageCard('Cover & Exec Summary', pageCount++);
+    
+    if (document.getElementById('pdf-sec-kpis').checked) {
+        addMockupPageCard('Key Metrics & KPIs', pageCount++);
+    }
+    if (document.getElementById('pdf-sec-quality').checked) {
+        addMockupPageCard('Data Quality Logs', pageCount++);
+    }
+    if (document.getElementById('pdf-sec-insights').checked) {
+        addMockupPageCard('Deep Insights Deck', pageCount++);
+    }
+    if (document.getElementById('pdf-sec-charts').checked) {
+        addMockupPageCard('Exploratory Charts', pageCount++);
+    }
+    if (document.getElementById('pdf-sec-recs').checked) {
+        addMockupPageCard('Strategic Action Plans', pageCount++);
+    }
 }
 
 async function generateCustomPdfReport() {
@@ -1038,6 +1076,15 @@ async function generateCustomPdfReport() {
         }
     }
     
+    const customNotes = {
+        summary: document.getElementById('pdf-notes-summary').value,
+        kpis: document.getElementById('pdf-notes-kpis').value,
+        quality: document.getElementById('pdf-notes-quality').value,
+        insights: document.getElementById('pdf-notes-insights').value,
+        charts: document.getElementById('pdf-notes-charts').value,
+        recommendations: document.getElementById('pdf-notes-recommendations').value
+    };
+
     try {
         const response = await fetch('/api/export/custom_pdf', {
             method: 'POST',
@@ -1047,7 +1094,8 @@ async function generateCustomPdfReport() {
                 company: company || 'InsightFlow',
                 accent_color: accentColor,
                 include_sections: includeSections,
-                logo_path: uploadedLogoPath
+                logo_path: uploadedLogoPath,
+                custom_notes: customNotes
             })
         });
         

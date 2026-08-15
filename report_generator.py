@@ -792,14 +792,31 @@ class PDFReport(FPDF):
         self.set_text_color(100, 116, 139)
         self.cell(0, 10, f"Page {self.page_no()}/{{nb}} | Generated for {self.report_company} by InsightFlow", align='C')
 
+def draw_commentary_box(pdf, text):
+    if not text or str(text).strip() == "":
+        return
+    pdf.ln(2)
+    pdf.set_fill_color(248, 250, 252) # Slate-50 background
+    pdf.set_draw_color(226, 232, 240) # Slate-200 border
+    pdf.set_font('Helvetica', 'I', 9)
+    pdf.set_text_color(71, 85, 105) # Slate-600 text
+    
+    # Calculate height and print
+    pdf.multi_cell(0, 5, f"Commentary: {text}", border=1, fill=True, align='L')
+    pdf.set_text_color(15, 23, 42) # restore color
+    pdf.set_font('Helvetica', '', 10)
+    pdf.ln(2)
+
 def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_paths, output_pdf_path,
                         title="EXECUTIVE ANALYSIS REPORT", company="InsightFlow", accent_color="#4f46e5",
-                        include_sections=None, logo_path=None):
+                        include_sections=None, logo_path=None, custom_notes=None):
     """
     Generates a professional multi-page PDF analytical report from computed metrics and static charts.
     """
     if include_sections is None:
         include_sections = ['kpis', 'quality', 'insights', 'charts', 'recommendations']
+    if custom_notes is None:
+        custom_notes = {}
 
     pdf = PDFReport(title=title, company=company, accent_color=accent_color, logo_path=logo_path)
     pdf.set_auto_page_break(auto=True, margin=20)
@@ -850,6 +867,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
         f"outlines data preparation logs, statistical summaries, visual indicators, and strategic suggestions."
     )
     pdf.multi_cell(0, 6, summary_text)
+    pdf.ln(2)
+    draw_commentary_box(pdf, custom_notes.get('summary'))
     pdf.ln(5)
     
     if 'kpis' in include_sections:
@@ -871,6 +890,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
             pdf.cell(90, 7, f" {kpi['name']}", border=1)
             pdf.cell(50, 7, f" {kpi['value']}", border=1)
             pdf.cell(50, 7, f" {kpi['column']}", border=1, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        draw_commentary_box(pdf, custom_notes.get('kpis'))
         pdf.ln(5)
         
     if 'quality' in include_sections:
@@ -883,6 +904,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
         pdf.set_font('Helvetica', '', 10)
         pdf.cell(0, 6, f"- Total duplicate rows removed: {metadata.get('duplicate_count', 0):,}", new_x="LMARGIN", new_y="NEXT")
         pdf.cell(0, 6, f"- Total empty fields found: {metadata.get('total_missing', 0):,}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        draw_commentary_box(pdf, custom_notes.get('quality'))
         pdf.ln(4)
         
     if 'insights' in include_sections:
@@ -902,6 +925,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
                     pdf.multi_cell(0, 5, f"  - {ins}")
                     pdf.ln(1)
                 pdf.ln(2)
+        draw_commentary_box(pdf, custom_notes.get('insights'))
+        pdf.ln(4)
 
     if 'charts' in include_sections and static_charts_paths:
         pdf.add_page()
@@ -921,6 +946,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
                 
                 pdf.image(path, x=15, y=pdf.get_y(), w=180, h=90)
                 pdf.ln(95)
+        draw_commentary_box(pdf, custom_notes.get('charts'))
+        pdf.ln(4)
                 
     if 'recommendations' in include_sections:
         # Recommendations & Conclusion Page
@@ -941,6 +968,8 @@ def generate_pdf_report(metadata, eda_results, insights, kpis, static_charts_pat
             pdf.multi_cell(0, 6, "▪ Set up continuous data logging with structured schema layouts to eliminate missing/null data cells prior to automated audits.")
             pdf.ln(3)
 
+        pdf.ln(2)
+        draw_commentary_box(pdf, custom_notes.get('recommendations'))
         pdf.ln(5)
         pdf.set_font('Helvetica', 'B', 12)
         pdf.cell(0, 8, "7. Conclusion", new_x="LMARGIN", new_y="NEXT")
